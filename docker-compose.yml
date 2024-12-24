@@ -16,10 +16,8 @@ services:
       MYSQL_DATABASE: "nuxbill"
       MYSQL_USER: "nuxbill"
       MYSQL_PASSWORD: "12345678"
+     volumes:
+       - mysql_data:/var/lib/mysql
 
-# skip data persistance (if dev testing)
-#     volumes:
-#       - mysql_data:/var/lib/mysql
-
-# volumes:
-#   mysql_data:
+   volumes:
+     mysql_data:
