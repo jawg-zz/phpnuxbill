@@ -65,7 +65,12 @@ if (!file_exists($UPLOAD_PATH . File::pathFixer('/notifications.default.json')))
     die();
 }
 
-require_once $root_path . 'config.php';
+// Load config.php from either root or config directory
+if (file_exists($root_path . 'config/config.php')) {
+    require_once $root_path . 'config/config.php';
+} else {
+    require_once $root_path . 'config.php';
+}
 require_once $root_path . File::pathFixer('system/orm.php');
 require_once $root_path . File::pathFixer('system/autoload/PEAR2/Autoload.php');
 include $root_path . File::pathFixer('system/autoload/Hookers.php');
