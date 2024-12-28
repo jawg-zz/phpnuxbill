@@ -5,12 +5,8 @@ services:
     environment:
       TZ: Africa/Nairobi
     volumes:
-      - uploads:/var/www/html/system/uploads
-      - type: bind
-        source: ./config.php
-        target: /var/www/html/config.php
-        content: ""
-
+      - ./data/uploads:/var/www/html/system/uploads
+      - ./data/config.php:/var/www/html/config.php
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost/ || exit 1"]
       interval: 30s
