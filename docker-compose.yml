@@ -5,7 +5,7 @@ services:
     environment:
       TZ: Africa/Nairobi
     volumes:
-      - ./data/uploads:/var/www/html/system/uploads
+      - uploads:/var/www/html/system/uploads
       - ./data/config.php:/var/www/html/config.php
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost/ || exit 1"]
