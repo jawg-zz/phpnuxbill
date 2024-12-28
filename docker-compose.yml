@@ -6,6 +6,11 @@ services:
       TZ: Africa/Nairobi
     volumes:
       - uploads:/var/www/html/system/uploads
+      - type: bind
+        source: ./config.php
+        target: /var/www/html/config.php
+        content: ""
+
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost/ || exit 1"]
       interval: 30s
