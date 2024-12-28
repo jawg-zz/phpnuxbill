@@ -1,0 +1,8 @@
+services:
+  nuxbill:
+    pull_policy: always
+    build: ./
+    environment:
+      TZ: Africa/Nairobi
+    volumes:
+      - site_data/uploads:/var/www/html/system/uploads
