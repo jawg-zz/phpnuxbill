@@ -11,8 +11,8 @@ system/cache/**
 system/plugin/*
 !system/cache/index.html
 !system/plugin/index.html
-system/paymentgateway/ui/**
-system/paymentgateway/**
+!system/paymentgateway/ui/**
+!system/paymentgateway/**
 !system/paymentgateway/ui/
 !system/paymentgateway/ui/index.html
 !system/paymentgateway/index.html
