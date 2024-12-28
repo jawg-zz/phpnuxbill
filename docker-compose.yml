@@ -6,7 +6,7 @@ services:
       TZ: Africa/Nairobi
     volumes:
       - uploads:/var/www/html/system/uploads
-      - ./data/config.php:/var/www/html/config.php
+      - config:/var/www/html/config
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost/ || exit 1"]
       interval: 30s

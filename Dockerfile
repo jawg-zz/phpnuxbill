@@ -1,6 +1,7 @@
 # Use the official PHP image with Apache
 FROM php:7.4-apache
 EXPOSE 80
+
 # Install necessary PHP extensions
 RUN apt-get update && apt-get install -y \
     libfreetype6-dev \
@@ -15,7 +16,12 @@ RUN apt-get update && apt-get install -y \
     && docker-php-ext-install pdo pdo_mysql \
     && docker-php-ext-install zip
 
-# copy contents into directory
+# Create config directory for persistent storage
+RUN mkdir -p /var/www/html/config && \
+    chown -R www-data:www-data /var/www/html/config && \
+    chmod -R 755 /var/www/html/config
+
+# Copy application files
 COPY . /var/www/html
 
 # Set appropriate permissions

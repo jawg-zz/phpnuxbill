@@ -39,9 +39,10 @@ function _autoloader($class)
 }
 spl_autoload_register('_autoloader');
 
-if (!file_exists($root_path . 'config.php')) {
+// Check for config.php in both default and config directory
+if (!file_exists($root_path . 'config.php') && !file_exists($root_path . 'config/config.php')) {
     $root_path .= '..' . DIRECTORY_SEPARATOR;
-    if (!file_exists($root_path . 'config.php')) {
+    if (!file_exists($root_path . 'config.php') && !file_exists($root_path . 'config/config.php')) {
         r2('install');
     }
 }
