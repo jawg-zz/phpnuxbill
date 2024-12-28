@@ -5,6 +5,6 @@ services:
     environment:
       TZ: Africa/Nairobi
     volumes:
-      - site_data/uploads:/var/www/html/system/uploads
-      - site_data/config.php:/var/www/html/config.php
+      - uploads:/var/www/html/system/uploads
+      - config.php:/var/www/html/config.php
 
