@@ -13,4 +13,3 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
-    network_mode: service:wireguard-easy-f0c4wcw4ckko448kcgkkgk88
