@@ -4,6 +4,8 @@ services:
     build: ./
     environment:
       TZ: Africa/Nairobi
+    ports:
+      - 8188:8188
     volumes:
       - uploads:/var/www/html/system/uploads
       - config:/var/www/html/config
