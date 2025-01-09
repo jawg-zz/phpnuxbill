@@ -7,6 +7,7 @@ services:
     volumes:
       - uploads:/var/www/html/system/uploads
       - config:/var/www/html/config
+    network_mode: "container:gluetun-jg0o8woco808cgccsk4skswo"
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost/ || exit 1"]
       interval: 30s
