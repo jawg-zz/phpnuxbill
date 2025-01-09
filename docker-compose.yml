@@ -7,7 +7,7 @@ services:
     volumes:
       - uploads:/var/www/html/system/uploads
       - config:/var/www/html/config
-    network_mode: "container:gluetun"
+    network_mode: "container:gluetun-pww8sg80gosg4s4skkk8go4g"
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost/ || exit 1"]
       interval: 30s
