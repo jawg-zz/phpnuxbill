@@ -14,7 +14,11 @@ RUN apt-get update && apt-get install -y \
     && docker-php-ext-install -j$(nproc) gd \
     && docker-php-ext-install pdo pdo_mysql \
     && docker-php-ext-install zip
-RUN mkdir /config
+
+# Create and configure config directory
+RUN mkdir -p /var/www/html/config \
+    && chown www-data:www-data /var/www/html/config \
+    && chmod 755 /var/www/html/config
 
 # copy contents into directory
 COPY . /var/www/html
