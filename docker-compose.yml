@@ -6,6 +6,7 @@ services:
       TZ: Africa/Nairobi
     volumes:
       - uploads:/var/www/html/system/uploads
+      - config:/var/www/html/config
     network_mode: "container:wg-easy-w44wk4csgkckos808cwkos4k"
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost/ || exit 1"]

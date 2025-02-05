@@ -22,7 +22,7 @@
         <div class="span12">
             <h4> PHPNuxBill Updater </h4>
             <pre><?php
-            include '../config.php';
+            include '../config/config.php';
             try{
                 $dbh = new pdo( "mysql:host=$db_host;dbname=$db_name",
                     "$db_user",

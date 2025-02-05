@@ -56,7 +56,7 @@ if($_app_stage!="Live"){
     ini_set("display_errors", 0);
     ini_set("display_startup_errors", 0);
 }';
-    $wConfig = "../config.php";
+    $wConfig = "../config/config.php";
     $fh = fopen($wConfig, 'w') or die("Can't create config file, your server does not support 'fopen' function,
 	please create a file named - config.php with following contents- <br/>$input");
     fwrite($fh, $input);
