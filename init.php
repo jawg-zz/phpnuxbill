@@ -18,13 +18,6 @@ if (!isset($isApi)) {
 function _autoloader($class)
 {
     global $root_path;
-        // Ensure we're using the latest root path after config check
-        $root_path = realpath(dirname(__FILE__)) . DIRECTORY_SEPARATOR;
-        if (file_exists($root_path . 'config.php')) {
-            $root_path = realpath(dirname(__FILE__)) . DIRECTORY_SEPARATOR;
-        } else {
-            $root_path = realpath(dirname(__FILE__) . DIRECTORY_SEPARATOR . '..') . DIRECTORY_SEPARATOR;
-        }
     if (strpos($class, '_') !== false) {
         $class = str_replace('_', DIRECTORY_SEPARATOR, $class);
         if (file_exists($root_path . DIRECTORY_SEPARATOR . 'system' . DIRECTORY_SEPARATOR . 'autoload' . DIRECTORY_SEPARATOR . $class . '.php')) {
