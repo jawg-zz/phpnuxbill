@@ -1,0 +1,15 @@
+services:
+  nuxbill:
+    pull_policy: always
+    build: ./
+    environment:
+      TZ: Africa/Nairobi
+    volumes:
+      - uploads:/var/www/html/system/uploads
+    network_mode: "container:wg-easy-w44wk4csgkckos808cwkos4k"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

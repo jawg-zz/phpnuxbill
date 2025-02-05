@@ -49,7 +49,7 @@ system/devices/**
 !system/devices/MikrotikPppoeCustom.php
 !system/devices/MikrotikHotspot.php
 /.vs
-docker-compose.yml
+!docker-compose.yml
 docs/**
 !docs/*.html
 !docs/*.md
