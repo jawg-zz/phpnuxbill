@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y \
     && docker-php-ext-install -j$(nproc) gd \
     && docker-php-ext-install pdo pdo_mysql \
     && docker-php-ext-install zip
+RUN mkdir /config
 
 # copy contents into directory
 COPY . /var/www/html
