@@ -1,7 +1,7 @@
 </section>
 </div>
 <footer class="main-footer">
-    <div class="pull-right" id="version" onclick="location.href = '{$_url}community#latestVersion';"></div>
+    <div class="pull-right" id="version" onclick="location.href = '{Text::url('community')}#latestVersion';"></div>
     PHPNuxBill by <a href="https://github.com/hotspotbilling/phpnuxbill" rel="nofollow noreferrer noopener"
         target="_blank">iBNuX</a>, Theme by <a href="https://adminlte.io/" rel="nofollow noreferrer noopener"
         target="_blank">AdminLTE</a>
@@ -13,7 +13,7 @@
 <script src="{$app_url}/ui/ui/scripts/plugins/select2.min.js"></script>
 <script src="{$app_url}/ui/ui/scripts/pace.min.js"></script>
 <script src="{$app_url}/ui/ui/summernote/summernote.min.js"></script>
-<script src="{$app_url}/ui/ui/scripts/custom.js"></script>
+<script src="{$app_url}/ui/ui/scripts/custom.js?2025.2.5"></script>
 
 <script>
     document.getElementById('openSearch').addEventListener('click', function () {
@@ -27,7 +27,7 @@
     document.getElementById('searchTerm').addEventListener('keyup', function () {
         let query = this.value;
         $.ajax({
-            url: '{$_url}search_user',
+            url: '{Text::url('search_user')}',
             type: 'GET',
             data: { query: query },
             success: function (data) {

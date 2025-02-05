@@ -22,6 +22,8 @@ switch ($action) {
             _alert(Lang::T('You do not have permission to access this page'), 'danger', "dashboard");
         }
 
+$appUrl = APP_URL;
+
         $select2_customer = <<<EOT
 <script>
 document.addEventListener("DOMContentLoaded", function(event) {
@@ -30,9 +32,9 @@ document.addEventListener("DOMContentLoaded", function(event) {
         ajax: {
             url: function(params) {
                 if(params.term != undefined){
-                    return './?_route=autoload/customer_select2&s='+params.term;
+                    return '{$appUrl}/?_route=autoload/customer_select2&s='+params.term;
                 }else{
-                    return './?_route=autoload/customer_select2';
+                    return '{$appUrl}/?_route=autoload/customer_select2';
                 }
             }
         }
@@ -72,6 +74,22 @@ EOT;
             $message = str_replace('[[user_name]]', $c['username'], $message);
             $message = str_replace('[[phone]]', $c['phonenumber'], $message);
             $message = str_replace('[[company_name]]', $config['CompanyName'], $message);
+			if (strpos($message, '[[payment_link]]') !== false) {
+				// token only valid for 1 day, for security reason
+				$token = User::generateToken($c['id'], 1);
+				if (!empty($token['token'])) {
+					$tur = ORM::for_table('tbl_user_recharges')
+						->where('customer_id', $c['id'])
+						//->where('namebp', $package)
+						->find_one();
+					if ($tur) {
+						$url = '?_route=home&recharge=' . $tur['id'] . '&uid=' . urlencode($token['token']);
+						$message = str_replace('[[payment_link]]', $url, $message);
+					}
+				} else {
+					$message = str_replace('[[payment_link]]', '', $message);
+				}
+			}
 
 
             //Send the message
