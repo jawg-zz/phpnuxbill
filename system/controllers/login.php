@@ -353,5 +353,41 @@ switch ($do) {
             }
         }
 
+        $plans = ORM::for_table('tbl_plans')->where('enabled', '1')->where('type', 'Hotspot')->find_many();
+        $plans = ORM::for_table('tbl_plans')->where('enabled', '1')->where('type', 'Hotspot')->find_many();
+        $ui->assign('plans', $plans);
+
+        break;
+    case 'initiate_payment':
+        $plan_id = _post('plan_id');
+        $phone_number = _post('phone_number');
+
+        // Validate input (add more validation as needed)
+        if (empty($plan_id) || empty($phone_number)) {
+            showResult(false, 'Missing plan ID or phone number');
+        }
+
+        // Fetch plan details
+        $plan = ORM::for_table('tbl_plans')->find_one($plan_id);
+        if (!$plan) {
+            showResult(false, 'Plan not found');
+        }
+
+        // Create a transaction object
+        $trx = ORM::for_table('tbl_payment_gateway')->create();
+        $trx->plan_id = $plan_id;
+        $trx->plan_name = $plan['name_plan'];
+        $trx->price = $plan['price'];
+        $trx->user_id = User::getID();
+        $trx->account = $phone_number;
+        $trx->payment_gateway = 'M-Pesa';
+        $trx->status = 1; // Pending
+        $trx->save();
+
+        // Initiate M-Pesa STK push
+        $user = ['phonenumber' => $phone_number]; // Assuming user object has phonenumber
+        mpesa_create_transaction($trx, $user);
+
+        showResult(true, 'M-Pesa STK push initiated. Please check your phone.');
         break;
 }

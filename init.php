@@ -38,15 +38,13 @@ function _autoloader($class)
     }
 }
 spl_autoload_register('_autoloader');
-
 if (!file_exists($root_path . 'config' . DIRECTORY_SEPARATOR . 'config.php')) {
-    $root_path .= '..' . DIRECTORY_SEPARATOR;
-    
+    $root_path .= '..' . DIRECTORY_SEPARATOR;   
+     
     if (!file_exists($root_path . 'config.php') && !file_exists($root_path . 'config' . DIRECTORY_SEPARATOR . 'config.php')) {
-        r2(getUrl('install'));
+        r2('./install');
     }
 }
-
 
 if (!file_exists($root_path .  File::pathFixer('system/orm.php'))) {
     echo $root_path . "orm.php file not found";

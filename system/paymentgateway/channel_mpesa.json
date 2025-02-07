@@ -1,0 +1,17 @@
+[
+    {
+        "code": "MPESA_STK_PUSH",
+        "name": "M-Pesa STK Push",
+        "description": "Instant payment via STK Push"
+    },
+    {
+        "code": "MPESA_TILL",
+        "name": "Buy Goods Till",
+        "description": "Pay via Till Number"
+    },
+    {
+        "code": "MPESA_PAYBILL",
+        "name": "Paybill Number",
+        "description": "Pay via Paybill"
+    }
+]
