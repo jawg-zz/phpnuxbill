@@ -19,7 +19,7 @@ system/plugin/*
 !system/plugin/ui/
 system/plugin/ui/*
 !system/plugin/ui/index.html
-ui/ui_custom/**
+!ui/ui_custom/**
 !ui/ui_custom/index.html
 !ui/ui_custom/README.md
 system/uploads/**
@@ -28,7 +28,7 @@ system/uploads/sms/**
 !system/uploads/sms/index.html
 system/uploads/system/**
 !system/uploads/system/index.html
-ui/themes/**
+!ui/themes/**
 !ui/themes/index.html
 !ui/themes/README.md
 scanLang.php
@@ -53,4 +53,4 @@ system/devices/**
 docs/**
 !docs/*.html
 !docs/*.md
-.htaccess
+!.htaccess
