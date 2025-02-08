@@ -53,4 +53,4 @@ system/devices/**
 docs/**
 !docs/*.html
 !docs/*.md
-!.htaccess
+.htaccess
