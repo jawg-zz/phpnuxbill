@@ -61,9 +61,9 @@
 
 <script>
 function togglePassword(inputId) {
-    const input = document.getElementById(inputId);
-    const button = input.parentElement.querySelector('button');
-    const icon = button.querySelector('i');
+    var input = document.getElementById(inputId);
+    var button = input.parentElement.querySelector('button');
+    var icon = button.querySelector('i');
     
     if (input.type === 'password') {
         input.type = 'text';
@@ -80,21 +80,24 @@ document.getElementById('mpesaForm').addEventListener('submit', function(event) 
     event.preventDefault();
     
     // Reset all error messages
-    document.querySelectorAll('.help-block.text-danger').forEach(el => {
-        el.textContent = '';
-    });
+    var errorMessages = document.querySelectorAll('.help-block.text-danger');
+    for (var i = 0; i < errorMessages.length; i++) {
+        errorMessages[i].textContent = '';
+    }
     
     // Reset all input borders
-    document.querySelectorAll('.form-control').forEach(input => {
-        input.classList.remove('has-error');
-    });
+    var inputs = document.querySelectorAll('.form-control');
+    for (var i = 0; i < inputs.length; i++) {
+        inputs[i].closest('.form-group').classList.remove('has-error');
+    }
 
-    let isValid = true;
-    const inputs = this.querySelectorAll('input[required]');
+    var isValid = true;
+    var requiredInputs = this.querySelectorAll('input[required]');
     
-    inputs.forEach(input => {
-        const errorElement = document.getElementById(`${input.id}_error`);
-        const formGroup = input.closest('.form-group');
+    for (var i = 0; i < requiredInputs.length; i++) {
+        var input = requiredInputs[i];
+        var errorElement = document.getElementById(input.id + '_error');
+        var formGroup = input.closest('.form-group');
         
         // Check if empty
         if (!input.value.trim()) {
@@ -111,7 +114,7 @@ document.getElementById('mpesaForm').addEventListener('submit', function(event) 
                 errorElement.textContent = 'Shortcode must contain only numbers';
             }
         }
-    });
+    }
 
     // If form is valid, submit it
     if (isValid) {
@@ -120,10 +123,11 @@ document.getElementById('mpesaForm').addEventListener('submit', function(event) 
 });
 
 // Real-time validation
-document.querySelectorAll('input[required]').forEach(input => {
-    input.addEventListener('input', function() {
-        const errorElement = document.getElementById(`${this.id}_error`);
-        const formGroup = this.closest('.form-group');
+var requiredInputs = document.querySelectorAll('input[required]');
+for (var i = 0; i < requiredInputs.length; i++) {
+    requiredInputs[i].addEventListener('input', function() {
+        var errorElement = document.getElementById(this.id + '_error');
+        var formGroup = this.closest('.form-group');
         
         // Clear error state
         formGroup.classList.remove('has-error');
@@ -137,7 +141,7 @@ document.querySelectorAll('input[required]').forEach(input => {
             }
         }
     });
-});
+}
 </script>
 
 {include file="sections/footer.tpl"}
