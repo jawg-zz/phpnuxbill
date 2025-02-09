@@ -1,4 +1,3 @@
-{#M-Pesa Configuration Template#}
 <div class="row">
     <div class="col-md-12">
         <h3>M-Pesa Configuration</h3>
