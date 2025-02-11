@@ -6,7 +6,7 @@
  * This script is for updating PHPNuxBill
  **/
 session_start();
-include "../config/config.php";
+include "config.php";
 
 if($db_password != null && ($db_pass == null || empty($db_pass))){
     // compability for old version
