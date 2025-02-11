@@ -1,3 +1,4 @@
+{include file="customer/header-public.tpl"}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -232,3 +233,4 @@
     </script>
 </body>
 </html>
+{include file="customer/footer-public.tpl"}
