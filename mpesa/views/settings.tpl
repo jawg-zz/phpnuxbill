@@ -79,13 +79,11 @@ function togglePassword(inputId) {
 document.getElementById('mpesaForm').addEventListener('submit', function(event) {
     event.preventDefault();
     
-    // Reset all error messages
     var errorMessages = document.querySelectorAll('.help-block.text-danger');
     for (var i = 0; i < errorMessages.length; i++) {
         errorMessages[i].textContent = '';
     }
     
-    // Reset all input borders
     var inputs = document.querySelectorAll('.form-control');
     for (var i = 0; i < inputs.length; i++) {
         inputs[i].closest('.form-group').classList.remove('has-error');
@@ -99,14 +97,12 @@ document.getElementById('mpesaForm').addEventListener('submit', function(event) 
         var errorElement = document.getElementById(input.id + '_error');
         var formGroup = input.closest('.form-group');
         
-        // Check if empty
         if (!input.value.trim()) {
             isValid = false;
             formGroup.classList.add('has-error');
             errorElement.textContent = 'This field is required';
         }
         
-        // Check shortcode pattern
         if (input.id === 'mpesa_shortcode' && input.value.trim()) {
             if (!/^[0-9]+$/.test(input.value)) {
                 isValid = false;
@@ -116,24 +112,20 @@ document.getElementById('mpesaForm').addEventListener('submit', function(event) 
         }
     }
 
-    // If form is valid, submit it
     if (isValid) {
         this.submit();
     }
 });
 
-// Real-time validation
 var requiredInputs = document.querySelectorAll('input[required]');
 for (var i = 0; i < requiredInputs.length; i++) {
     requiredInputs[i].addEventListener('input', function() {
         var errorElement = document.getElementById(this.id + '_error');
         var formGroup = this.closest('.form-group');
         
-        // Clear error state
         formGroup.classList.remove('has-error');
         errorElement.textContent = '';
         
-        // Validate shortcode format
         if (this.id === 'mpesa_shortcode' && this.value.trim()) {
             if (!/^[0-9]+$/.test(this.value)) {
                 formGroup.classList.add('has-error');
