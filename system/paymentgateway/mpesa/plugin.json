@@ -3,7 +3,8 @@
     "version": "1.0.0",
     "author": "Spidmax Technologies",
     "description": "M-Pesa payment integration for PHPNuxBill",
-    "url": "https://github.com/yourusername/phpnuxbill-mpesa",
+    "url": "https://github.com/spidmax/phpnuxbill-mpesa",
+    "priority": 1,
     "require": {
         "phpnuxbill": ">=2.0.0"
     }
