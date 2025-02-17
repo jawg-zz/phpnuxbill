@@ -43,7 +43,7 @@ class Message
                     $txts = str_split($txt, 160);
                     try {
                         foreach ($txts as $txt) {
-                            self::sendSMS($config['sms_url'], $phone, $txt);
+                            self::MikrotikSendSMS($config['sms_url'], $phone, $txt);
                         }
                     } catch (Exception $e) {
                         // ignore, add to logs

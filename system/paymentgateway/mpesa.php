@@ -111,6 +111,10 @@ function mpesa_create_transaction($trx, $user)
     if (!isset($result['ResponseCode']) || $result['ResponseCode'] !== '0') {
         sendTelegram("M-Pesa payment failed\n\n" . json_encode($result, JSON_PRETTY_PRINT));
         r2(U . 'order/package', 'e', Lang::T("Failed to create transaction. Please try again."));
+        #add debug log to tell what failed
+        _log('M-Pesa payment failed\n\n' . json_encode($result, JSON_PRETTY_PRINT), 'Payment Gateway', $user['id']);      
+        
+
     }
 
     $d = ORM::for_table('tbl_payment_gateway')
