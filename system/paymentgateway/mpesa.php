@@ -80,18 +80,11 @@ function mpesa_save_config()
 }
 
 function mpesa_create_transaction($trx, $user) {
-    global $config, $_app_stage;
-    
-    // Add debug logs at the start
-    _log("M-Pesa Debug [TRX: {$trx['id']}]:", 'MPesa');
-    _log("- Environment: " . $_app_stage, 'MPesa');
-    _log("- API URL: " . mpesa_get_server(), 'MPesa');
-    _log("- Shortcode: " . $config['mpesa_shortcode'], 'MPesa');
-    _log("- Shortcode Type: Paybill", 'MPesa');
-    
+    global $config;
+
     $timestamp = date('YmdHis');
     $password = base64_encode($config['mpesa_shortcode'] . $config['mpesa_passkey'] . $timestamp);
-    
+
     $json = [
         'BusinessShortCode' => $config['mpesa_shortcode'],
         'Password' => $password,
@@ -102,41 +95,45 @@ function mpesa_create_transaction($trx, $user) {
         'PartyB' => $config['mpesa_shortcode'],
         'PhoneNumber' => $user['phonenumber'],
         'CallBackURL' => U . 'callback/mpesa',
-        'AccountReference' => $trx['id'],
+        'AccountReference' => $trx['id'], // This becomes BillRefNumber
         'TransactionDesc' => 'Payment for Order #' . $trx['id']
     ];
-
-    // Debug log the request
-    _log("M-Pesa Request [TRX: {$trx['id']}]: " . json_encode($json), 'MPesa');
 
     $token = mpesa_get_token();
     $headers = [
         'Authorization: Bearer ' . $token,
+        'Content-Type: application/json'
     ];
 
-    // Debug log the token
-    _log("M-Pesa Token [TRX: {$trx['id']}]: " . $token, 'MPesa');
+    _log("M-Pesa Request [TRX: {$trx['id']}]: " . json_encode($json), 'MPesa');
 
     $result = json_decode(Http::postJsonData(mpesa_get_server() . 'mpesa/stkpush/v1/processrequest', $json, $headers), true);
 
-    // Debug log the response
-    _log("M-Pesa Response [TRX: {$trx['id']}]: " . json_encode($result), 'MPesa');
-
     if (!isset($result['ResponseCode']) || $result['ResponseCode'] !== '0') {
+        // If error is about locked subscriber, add retry logic
+        if (isset($result['errorCode']) && $result['errorCode'] === '500.001.1001') {
+            _log("M-Pesa Subscriber Locked [TRX: {$trx['id']}] - Waiting 30 seconds before retry", 'MPesa');
+            sleep(30); // Wait 30 seconds
+            return mpesa_create_transaction($trx, $user); // Retry once
+        }
+        
         $error_msg = "M-Pesa payment failed\nTransaction ID: {$trx['id']}\nUser: {$user['username']}\nPhone: {$user['phonenumber']}\nAmount: {$trx['price']}\n\nResponse:\n" . json_encode($result, JSON_PRETTY_PRINT);
         _log("M-Pesa Error [TRX: {$trx['id']}]: " . $error_msg, 'MPesa');
         sendTelegram($error_msg);
-        r2(U . 'order/package', 'e', Lang::T("Failed to create transaction. Please try again."));
+        r2(U . 'order/package', 'e', Lang::T("Failed to create transaction. Please try again in a few minutes."));
     }
 
+    // Update transaction with M-Pesa details
     $d = ORM::for_table('tbl_payment_gateway')
-        ->where('username', $user['username'])
-        ->where('status', 1)
+        ->where('id', $trx['id'])  // Changed from username to id
         ->find_one();
-    $d->gateway_trx_id = $result['CheckoutRequestID'];
-    $d->pg_request = json_encode($result);
-    $d->expired_date = date('Y-m-d H:i:s', strtotime('+ 4 HOURS'));
-    $d->save();
+    
+    if ($d) {
+        $d->gateway_trx_id = $result['CheckoutRequestID'];
+        $d->pg_request = json_encode($result);
+        $d->expired_date = date('Y-m-d H:i:s', strtotime('+ 4 HOURS'));
+        $d->save();
+    }
 
     _log("M-Pesa Transaction Created [TRX: {$trx['id']}] CheckoutRequestID: {$result['CheckoutRequestID']}", 'MPesa');
     r2(U . "order/view/" . $trx['id'], 's', Lang::T("Please check your phone to complete payment"));
