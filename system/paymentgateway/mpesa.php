@@ -102,7 +102,6 @@ function mpesa_create_transaction($trx, $user) {
     $token = mpesa_get_token();
     $headers = [
         'Authorization: Bearer ' . $token,
-        'Content-Type: application/json'
     ];
 
     _log("M-Pesa Request [TRX: {$trx['id']}]: " . json_encode($json), 'MPesa');
