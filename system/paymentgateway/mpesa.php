@@ -208,36 +208,80 @@ function mpesa_payment_notification()
 
     if (isset($callback['Body']['stkCallback'])) {
         $result = $callback['Body']['stkCallback'];
+        
+        // Debug the full callback structure
+        _log("M-Pesa Callback Structure: " . json_encode($result, JSON_PRETTY_PRINT), 'MPesa');
+        
+        // Check if BillRefNumber exists
+        if (!isset($result['BillRefNumber'])) {
+            _log("M-Pesa Error: Missing BillRefNumber in callback", 'MPesa');
+            die('OK');
+        }
+        
         $trx_id = $result['BillRefNumber'];
+        
+        // Validate transaction ID
+        if (empty($trx_id)) {
+            _log("M-Pesa Error: Empty transaction ID", 'MPesa');
+            die('OK');
+        }
         
         _log("M-Pesa Callback [TRX: $trx_id]: " . json_encode($result), 'MPesa');
         
-        if ($result['ResultCode'] === 0) {
-            $trx = ORM::for_table('tbl_payment_gateway')
-                ->where('id', $trx_id)
-                ->find_one();
-                
-            if ($trx) {
-                $user = ORM::for_table('tbl_customers')->find_one($trx['user_id']);
-                if (!Package::rechargeUser($user['id'], $trx['routers'], $trx['plan_id'], $trx['gateway'], 'M-Pesa')) {
-                    $error_msg = "Failed to activate package\nTransaction ID: $trx_id\nUser: {$user['username']}\nRouter: {$trx['routers']}\nPlan: {$trx['plan_id']}";
-                    _log("M-Pesa Package Activation Error [TRX: $trx_id]: " . $error_msg, 'MPesa');
-                    sendTelegram($error_msg);
-                } else {
-                    _log("M-Pesa Package Activated [TRX: $trx_id] for user {$user['username']}", 'MPesa');
-                }
-                
-                $trx->pg_paid_response = json_encode($result);
-                $trx->payment_method = 'M-Pesa';
-                $trx->payment_channel = 'STK Push';
-                $trx->paid_date = date('Y-m-d H:i:s');
-                $trx->status = 2;
-                $trx->save();
-            } else {
-                _log("M-Pesa Error [TRX: $trx_id]: Transaction not found in database", 'MPesa');
+        // Look up transaction first
+        $trx = ORM::for_table('tbl_payment_gateway')
+            ->where('id', $trx_id)
+            ->find_one();
+            
+        if (!$trx) {
+            // Try looking up by CheckoutRequestID
+            if (isset($result['CheckoutRequestID'])) {
+                $trx = ORM::for_table('tbl_payment_gateway')
+                    ->where('gateway_trx_id', $result['CheckoutRequestID'])
+                    ->find_one();
             }
+        }
+        
+        if (!$trx) {
+            _log("M-Pesa Error: Transaction not found. ID: $trx_id, CheckoutRequestID: " . 
+                 ($result['CheckoutRequestID'] ?? 'none'), 'MPesa');
+            
+            // Debug query
+            $query = ORM::for_table('tbl_payment_gateway')
+                ->where('id', $trx_id)
+                ->build_select();
+            _log("M-Pesa Debug - Search Query: " . $query, 'MPesa');
+            
+            die('OK');
+        }
+        
+        if ($result['ResultCode'] === 0) {
+            $user = ORM::for_table('tbl_customers')->find_one($trx['user_id']);
+            if (!$user) {
+                _log("M-Pesa Error: User not found for transaction $trx_id", 'MPesa');
+                die('OK');
+            }
+            
+            if (!Package::rechargeUser($user['id'], $trx['routers'], $trx['plan_id'], $trx['gateway'], 'M-Pesa')) {
+                $error_msg = "Failed to activate package\nTransaction ID: $trx_id\n" .
+                            "User: {$user['username']}\nRouter: {$trx['routers']}\n" .
+                            "Plan: {$trx['plan_id']}";
+                _log("M-Pesa Package Activation Error [TRX: $trx_id]: " . $error_msg, 'MPesa');
+                sendTelegram($error_msg);
+            } else {
+                _log("M-Pesa Package Activated [TRX: $trx_id] for user {$user['username']}", 'MPesa');
+            }
+            
+            $trx->pg_paid_response = json_encode($result);
+            $trx->payment_method = 'M-Pesa';
+            $trx->payment_channel = 'STK Push';
+            $trx->paid_date = date('Y-m-d H:i:s');
+            $trx->status = 2;
+            $trx->save();
         } else {
-            $error_msg = "M-PESA payment failed\nTransaction ID: $trx_id\nResult Code: {$result['ResultCode']}\nResult Description: {$result['ResultDesc']}";
+            $error_msg = "M-PESA payment failed\nTransaction ID: $trx_id\n" .
+                        "Result Code: {$result['ResultCode']}\n" .
+                        "Result Description: {$result['ResultDesc']}";
             _log("M-Pesa Payment Failed [TRX: $trx_id]: " . $error_msg, 'MPesa');
             sendTelegram($error_msg);
         }
