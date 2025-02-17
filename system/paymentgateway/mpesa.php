@@ -112,7 +112,6 @@ function mpesa_create_transaction($trx, $user) {
     $token = mpesa_get_token();
     $headers = [
         'Authorization: Bearer ' . $token,
-        'Content-Type: application/json'
     ];
 
     // Debug log the token
