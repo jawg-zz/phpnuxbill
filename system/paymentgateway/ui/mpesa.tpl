@@ -77,7 +77,7 @@
                     <div class="form-group">
                         <div class="col-md-offset-3 col-md-9">
                             <button class="btn btn-success btn-lg" type="submit">
-                                <i class="fa fa-save"></i> {$_L['Save']} M-Pesa Settings
+                                <i class="fa fa-save"></i> {Lang::T('Save')} M-Pesa Settings
                             </button>
                         </div>
                     </div>
