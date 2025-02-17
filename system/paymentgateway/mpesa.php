@@ -82,6 +82,19 @@ function mpesa_save_config()
 function mpesa_create_transaction($trx, $user) {
     global $config;
 
+    // Check for recent pending transactions for this phone number
+    $recent_pending = ORM::for_table('tbl_payment_gateway')
+        ->where('user_id', $user['id'])
+        ->where('gateway', 'mpesa')
+        ->where('status', 1) // Pending status
+        ->where_raw('created_date >= DATE_SUB(NOW(), INTERVAL 2 MINUTE)')
+        ->find_one();
+
+    if ($recent_pending) {
+        _log("M-Pesa Prevented Duplicate [Phone: {$user['phonenumber']}]: Previous transaction still pending", 'MPesa');
+        r2(U . 'order/package', 'w', Lang::T("Please wait 2 minutes before trying again or check your phone for a pending payment request."));
+    }
+
     $timestamp = date('YmdHis');
     $password = base64_encode($config['mpesa_shortcode'] . $config['mpesa_passkey'] . $timestamp);
 
@@ -112,6 +125,12 @@ function mpesa_create_transaction($trx, $user) {
         $error_msg = "M-Pesa payment failed\nTransaction ID: {$trx['id']}\nUser: {$user['username']}\nPhone: {$user['phonenumber']}\nAmount: {$trx['price']}\n\nResponse:\n" . json_encode($result, JSON_PRETTY_PRINT);
         _log("M-Pesa Error [TRX: {$trx['id']}]: " . $error_msg, 'MPesa');
         sendTelegram($error_msg);
+        
+        // If it's specifically a locked subscriber error
+        if (isset($result['errorCode']) && $result['errorCode'] === '500.001.1001') {
+            r2(U . 'order/package', 'w', Lang::T("You have a pending M-Pesa request. Please check your phone or wait 2 minutes before trying again."));
+        }
+        
         r2(U . 'order/package', 'e', Lang::T("Failed to create transaction. Please try again in a few minutes."));
     }
 
