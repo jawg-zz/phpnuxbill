@@ -79,9 +79,15 @@ function mpesa_save_config()
     r2(U . 'paymentgateway/mpesa', 's', Lang::T('Settings_Saved_Successfully'));
 }
 
-function mpesa_create_transaction($trx, $user)
-{
-    global $config;
+function mpesa_create_transaction($trx, $user) {
+    global $config, $_app_stage;
+    
+    // Add debug logs at the start
+    _log("M-Pesa Debug [TRX: {$trx['id']}]:", 'MPesa');
+    _log("- Environment: " . $_app_stage, 'MPesa');
+    _log("- API URL: " . mpesa_get_server(), 'MPesa');
+    _log("- Shortcode: " . $config['mpesa_shortcode'], 'MPesa');
+    _log("- Shortcode Type: Paybill", 'MPesa');
     
     $timestamp = date('YmdHis');
     $password = base64_encode($config['mpesa_shortcode'] . $config['mpesa_passkey'] . $timestamp);
