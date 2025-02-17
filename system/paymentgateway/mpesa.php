@@ -82,19 +82,6 @@ function mpesa_save_config()
 function mpesa_create_transaction($trx, $user) {
     global $config;
 
-    // Check for recent pending transactions for this phone number
-    $recent_pending = ORM::for_table('tbl_payment_gateway')
-        ->where('user_id', $user['id'])
-        ->where('gateway', 'mpesa')
-        ->where('status', 1) // Pending status
-        ->where_raw('created_date >= DATE_SUB(NOW(), INTERVAL 2 MINUTE)')
-        ->find_one();
-
-    if ($recent_pending) {
-        _log("M-Pesa Prevented Duplicate [Phone: {$user['phonenumber']}]: Previous transaction still pending", 'MPesa');
-        r2(U . 'order/package', 'w', Lang::T("Please wait 2 minutes before trying again or check your phone for a pending payment request."));
-    }
-
     $timestamp = date('YmdHis');
     $password = base64_encode($config['mpesa_shortcode'] . $config['mpesa_passkey'] . $timestamp);
 
@@ -128,9 +115,23 @@ function mpesa_create_transaction($trx, $user) {
         
         // If it's specifically a locked subscriber error
         if (isset($result['errorCode']) && $result['errorCode'] === '500.001.1001') {
-            r2(U . 'order/package', 'w', Lang::T("You have a pending M-Pesa request. Please check your phone or wait 2 minutes before trying again."));
+            // Delete the current transaction since it failed
+            $d = ORM::for_table('tbl_payment_gateway')
+                ->where('id', $trx['id'])
+                ->find_one();
+            if ($d) {
+                $d->delete();
+            }
+            r2(U . 'order/package', 'w', Lang::T("There is a pending M-Pesa request on your phone. Please complete or cancel it first, then try again."));
         }
         
+        // Delete the current transaction for other errors too
+        $d = ORM::for_table('tbl_payment_gateway')
+                ->where('id', $trx['id'])
+                ->find_one();
+        if ($d) {
+            $d->delete();
+        }
         r2(U . 'order/package', 'e', Lang::T("Failed to create transaction. Please try again in a few minutes."));
     }
 
