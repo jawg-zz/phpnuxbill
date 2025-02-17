@@ -161,7 +161,6 @@ function mpesa_get_status($trx, $user)
     $token = mpesa_get_token();
     $headers = [
         'Authorization: Bearer ' . $token,
-        'Content-Type: application/json'
     ];
 
     // Debug log the status check request
