@@ -6,13 +6,25 @@
  * Payment Gateway M-Pesa
  **/
 
-function mpesa_validate_config()
-{
+function mpesa_validate_config() {
     global $config;
-    if (empty($config['mpesa_consumer_key']) || empty($config['mpesa_consumer_secret']) || 
-        empty($config['mpesa_shortcode']) || empty($config['mpesa_passkey'])) {
-        sendTelegram("M-Pesa payment gateway not configured");
-        r2(U . 'order/package', 'w', Lang::T("Admin has not yet setup M-Pesa payment gateway, please tell admin"));
+    $mpesa_config = [
+        'mpesa_consumer_key',
+        'mpesa_consumer_secret',
+        'mpesa_shortcode',
+        'mpesa_passkey',
+        'mpesa_pending_timeout' => 120 // Default 2 minutes in seconds
+    ];
+    foreach ($mpesa_config as $key => $value) {
+        if (is_numeric($key)) {
+            if (empty($config[$value])) {
+                r2(U . 'order/package', 'e', "Please configure $value in Settings");
+            }
+        } else {
+            if (empty($config[$key])) {
+                $config[$key] = $value;
+            }
+        }
     }
 }
 
@@ -30,7 +42,17 @@ function mpesa_save_config()
     $mpesa_consumer_secret = _post('mpesa_consumer_secret');
     $mpesa_shortcode = _post('mpesa_shortcode');
     $mpesa_passkey = _post('mpesa_passkey');
+    $mpesa_pending_timeout = _post('mpesa_pending_timeout');
 
+    // Validate pending timeout
+    $mpesa_pending_timeout = intval($mpesa_pending_timeout);
+    if ($mpesa_pending_timeout < 30) {
+        $mpesa_pending_timeout = 30;
+    } else if ($mpesa_pending_timeout > 300) {
+        $mpesa_pending_timeout = 300;
+    }
+
+    // Save consumer key
     $d = ORM::for_table('tbl_appconfig')->where('setting', 'mpesa_consumer_key')->find_one();
     if($d){
         $d->value = $mpesa_consumer_key;
@@ -42,6 +64,7 @@ function mpesa_save_config()
         $d->save();
     }
 
+    // Save consumer secret
     $d = ORM::for_table('tbl_appconfig')->where('setting', 'mpesa_consumer_secret')->find_one();
     if($d){
         $d->value = $mpesa_consumer_secret;
@@ -53,6 +76,7 @@ function mpesa_save_config()
         $d->save();
     }
 
+    // Save shortcode
     $d = ORM::for_table('tbl_appconfig')->where('setting', 'mpesa_shortcode')->find_one();
     if($d){
         $d->value = $mpesa_shortcode;
@@ -64,6 +88,7 @@ function mpesa_save_config()
         $d->save();
     }
 
+    // Save passkey
     $d = ORM::for_table('tbl_appconfig')->where('setting', 'mpesa_passkey')->find_one();
     if($d){
         $d->value = $mpesa_passkey;
@@ -72,6 +97,18 @@ function mpesa_save_config()
         $d = ORM::for_table('tbl_appconfig')->create();
         $d->setting = 'mpesa_passkey';
         $d->value = $mpesa_passkey;
+        $d->save();
+    }
+
+    // Save pending timeout
+    $d = ORM::for_table('tbl_appconfig')->where('setting', 'mpesa_pending_timeout')->find_one();
+    if($d){
+        $d->value = $mpesa_pending_timeout;
+        $d->save();
+    }else{
+        $d = ORM::for_table('tbl_appconfig')->create();
+        $d->setting = 'mpesa_pending_timeout';
+        $d->value = $mpesa_pending_timeout;
         $d->save();
     }
 
