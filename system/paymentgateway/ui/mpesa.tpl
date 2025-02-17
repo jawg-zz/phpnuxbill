@@ -59,6 +59,18 @@
                         </div>
                     </div>
                     <div class="form-group">
+                        <label class="col-md-3 control-label">Pending Timeout</label>
+                        <div class="col-md-9">
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="mpesa_pending_timeout" name="mpesa_pending_timeout"
+                                    value="{if isset($_c['mpesa_pending_timeout'])}{$_c['mpesa_pending_timeout']}{else}120{/if}"
+                                    min="30" max="300" required>
+                                <span class="input-group-addon">seconds</span>
+                            </div>
+                            <small class="help-block">Time to wait for M-Pesa payment completion (30-300 seconds)</small>
+                        </div>
+                    </div>
+                    <div class="form-group">
                         <label class="col-md-3 control-label">Callback URL</label>
                         <div class="col-md-9">
                             <div class="input-group">

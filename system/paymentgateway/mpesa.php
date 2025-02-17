@@ -12,18 +12,27 @@ function mpesa_validate_config() {
         'mpesa_consumer_key',
         'mpesa_consumer_secret',
         'mpesa_shortcode',
-        'mpesa_passkey',
-        'mpesa_pending_timeout' => 120 // Default 2 minutes in seconds
+        'mpesa_passkey'
     ];
-    foreach ($mpesa_config as $key => $value) {
-        if (is_numeric($key)) {
-            if (empty($config[$value])) {
-                r2(U . 'order/package', 'e', "Please configure $value in Settings");
-            }
+    
+    // Check required configs
+    foreach ($mpesa_config as $key) {
+        if (empty($config[$key])) {
+            r2(U . 'order/package', 'e', "Please configure $key in Settings");
+        }
+    }
+
+    // Ensure pending timeout has a valid value
+    if (empty($config['mpesa_pending_timeout'])) {
+        $config['mpesa_pending_timeout'] = 120; // Default 2 minutes
+    } else {
+        $timeout = intval($config['mpesa_pending_timeout']);
+        if ($timeout < 30) {
+            $config['mpesa_pending_timeout'] = 30;
+        } else if ($timeout > 300) {
+            $config['mpesa_pending_timeout'] = 300;
         } else {
-            if (empty($config[$key])) {
-                $config[$key] = $value;
-            }
+            $config['mpesa_pending_timeout'] = $timeout;
         }
     }
 }
@@ -118,6 +127,28 @@ function mpesa_save_config()
 
 function mpesa_create_transaction($trx, $user) {
     global $config;
+    
+    // Check for pending transactions
+    $timeout = intval($config['mpesa_pending_timeout']);
+    $cutoff_time = date('Y-m-d H:i:s', strtotime("-{$timeout} seconds"));
+    
+    $pending = ORM::for_table('tbl_payment_gateway')
+        ->where('user_id', $user['id'])
+        ->where('payment_gateway', 'M-Pesa')
+        ->where('status', 1)
+        ->where_gt('created_date', $cutoff_time)
+        ->find_one();
+        
+    if ($pending) {
+        // Delete the current transaction since we can't proceed
+        $d = ORM::for_table('tbl_payment_gateway')
+            ->where('id', $trx['id'])
+            ->find_one();
+        if ($d) {
+            $d->delete();
+        }
+        r2(U . 'order/package', 'w', Lang::T("Please wait for your previous M-Pesa request to complete or timeout before trying again."));
+    }
 
     $timestamp = date('YmdHis');
     $password = base64_encode($config['mpesa_shortcode'] . $config['mpesa_passkey'] . $timestamp);
@@ -191,6 +222,22 @@ function mpesa_create_transaction($trx, $user) {
 function mpesa_get_status($trx, $user)
 {
     global $config;
+    
+    // Check if transaction has exceeded timeout
+    $timeout = intval($config['mpesa_pending_timeout']);
+    $cutoff_time = date('Y-m-d H:i:s', strtotime("-{$timeout} seconds"));
+    
+    if ($trx['created_date'] < $cutoff_time && $trx['status'] == 1) {
+        // Transaction has timed out
+        $d = ORM::for_table('tbl_payment_gateway')
+            ->where('id', $trx['id'])
+            ->find_one();
+        if ($d) {
+            $d->status = 3; // Assuming 3 is the status code for timeout/failed
+            $d->save();
+        }
+        return ['success' => false, 'message' => Lang::T('Transaction timed out. Please try again.')];
+    }
 
     _log("M-Pesa Status Check [TRX: {$trx['id']}] Started", 'MPesa');
 
