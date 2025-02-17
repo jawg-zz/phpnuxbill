@@ -211,7 +211,7 @@ function mpesa_get_token()
     $credentials = base64_encode($config['mpesa_consumer_key'] . ':' . $config['mpesa_consumer_secret']);
     $headers = ['Authorization: Basic ' . $credentials];
     
-    $result = json_decode(Http::get(mpesa_get_server() . 'oauth/v1/generate?grant_type=client_credentials', $headers), true);
+    $result = json_decode(Http::getData(mpesa_get_server() . 'oauth/v1/generate?grant_type=client_credentials', $headers), true);
     
     if (isset($result['access_token'])) {
         return $result['access_token'];
