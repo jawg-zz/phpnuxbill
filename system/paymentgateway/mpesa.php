@@ -95,13 +95,13 @@ function mpesa_create_transaction($trx, $user) {
         'PartyB' => $config['mpesa_shortcode'],
         'PhoneNumber' => $user['phonenumber'],
         'CallBackURL' => U . 'callback/mpesa',
-        'AccountReference' => $trx['id'], // This becomes BillRefNumber
+        'AccountReference' => $trx['id'],
         'TransactionDesc' => 'Payment for Order #' . $trx['id']
     ];
 
     $token = mpesa_get_token();
     $headers = [
-        'Authorization: Bearer ' . $token,
+        'Authorization: Bearer ' . $token
     ];
 
     _log("M-Pesa Request [TRX: {$trx['id']}]: " . json_encode($json), 'MPesa');
@@ -109,13 +109,6 @@ function mpesa_create_transaction($trx, $user) {
     $result = json_decode(Http::postJsonData(mpesa_get_server() . 'mpesa/stkpush/v1/processrequest', $json, $headers), true);
 
     if (!isset($result['ResponseCode']) || $result['ResponseCode'] !== '0') {
-        // If error is about locked subscriber, add retry logic
-        if (isset($result['errorCode']) && $result['errorCode'] === '500.001.1001') {
-            _log("M-Pesa Subscriber Locked [TRX: {$trx['id']}] - Waiting 30 seconds before retry", 'MPesa');
-            sleep(30); // Wait 30 seconds
-            return mpesa_create_transaction($trx, $user); // Retry once
-        }
-        
         $error_msg = "M-Pesa payment failed\nTransaction ID: {$trx['id']}\nUser: {$user['username']}\nPhone: {$user['phonenumber']}\nAmount: {$trx['price']}\n\nResponse:\n" . json_encode($result, JSON_PRETTY_PRINT);
         _log("M-Pesa Error [TRX: {$trx['id']}]: " . $error_msg, 'MPesa');
         sendTelegram($error_msg);
@@ -124,7 +117,7 @@ function mpesa_create_transaction($trx, $user) {
 
     // Update transaction with M-Pesa details
     $d = ORM::for_table('tbl_payment_gateway')
-        ->where('id', $trx['id'])  // Changed from username to id
+        ->where('id', $trx['id'])
         ->find_one();
     
     if ($d) {
