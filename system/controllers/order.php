@@ -702,6 +702,11 @@ switch ($action) {
             call_user_func($gateway . '_create_transaction', $d, $user);
         }
         break;
+    case 'initiate':
+        if ($trx['gateway'] == 'mpesa') {
+            mpesa_create_transaction($trx, $user);
+        }
+        break;
     default:
         r2(getUrl('order/package/'), 's', '');
 }

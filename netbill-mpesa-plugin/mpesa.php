@@ -103,7 +103,6 @@ function mpesa_create_transaction($trx, $user)
     $token = mpesa_get_token();
     $headers = [
         'Authorization: Bearer ' . $token,
-        'Content-Type: application/json'
     ];
 
     $result = json_decode(Http::postJsonData(mpesa_get_server() . 'mpesa/stkpush/v1/processrequest', $json, $headers), true);
@@ -211,7 +210,7 @@ function mpesa_get_token()
     $credentials = base64_encode($config['mpesa_consumer_key'] . ':' . $config['mpesa_consumer_secret']);
     $headers = ['Authorization: Basic ' . $credentials];
     
-    $result = json_decode(Http::get(mpesa_get_server() . 'oauth/v1/generate?grant_type=client_credentials', $headers), true);
+    $result = json_decode(Http::getData(mpesa_get_server() . 'oauth/v1/generate?grant_type=client_credentials', $headers), true);
     
     if (isset($result['access_token'])) {
         return $result['access_token'];
