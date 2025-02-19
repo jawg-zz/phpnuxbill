@@ -26,52 +26,25 @@ function mpesa_show_config()
 function mpesa_save_config()
 {
     global $admin;
-    $mpesa_consumer_key = _post('mpesa_consumer_key');
-    $mpesa_consumer_secret = _post('mpesa_consumer_secret');
-    $mpesa_shortcode = _post('mpesa_shortcode');
-    $mpesa_passkey = _post('mpesa_passkey');
+    
+    $settings = [
+        'mpesa_consumer_key' => _post('mpesa_consumer_key'),
+        'mpesa_consumer_secret' => _post('mpesa_consumer_secret'),
+        'mpesa_shortcode' => _post('mpesa_shortcode'),
+        'mpesa_passkey' => _post('mpesa_passkey')
+    ];
 
-    $d = ORM::for_table('tbl_appconfig')->where('setting', 'mpesa_consumer_key')->find_one();
-    if($d){
-        $d->value = $mpesa_consumer_key;
-        $d->save();
-    }else{
-        $d = ORM::for_table('tbl_appconfig')->create();
-        $d->setting = 'mpesa_consumer_key';
-        $d->value = $mpesa_consumer_key;
-        $d->save();
-    }
-
-    $d = ORM::for_table('tbl_appconfig')->where('setting', 'mpesa_consumer_secret')->find_one();
-    if($d){
-        $d->value = $mpesa_consumer_secret;
-        $d->save();
-    }else{
-        $d = ORM::for_table('tbl_appconfig')->create();
-        $d->setting = 'mpesa_consumer_secret';
-        $d->value = $mpesa_consumer_secret;
-        $d->save();
-    }
-
-    $d = ORM::for_table('tbl_appconfig')->where('setting', 'mpesa_shortcode')->find_one();
-    if($d){
-        $d->value = $mpesa_shortcode;
-        $d->save();
-    }else{
-        $d = ORM::for_table('tbl_appconfig')->create();
-        $d->setting = 'mpesa_shortcode';
-        $d->value = $mpesa_shortcode;
-        $d->save();
-    }
-
-    $d = ORM::for_table('tbl_appconfig')->where('setting', 'mpesa_passkey')->find_one();
-    if($d){
-        $d->value = $mpesa_passkey;
-        $d->save();
-    }else{
-        $d = ORM::for_table('tbl_appconfig')->create();
-        $d->setting = 'mpesa_passkey';
-        $d->value = $mpesa_passkey;
+    foreach ($settings as $key => $value) {
+        $d = ORM::for_table('tbl_appconfig')
+            ->where('setting', $key)
+            ->find_one();
+            
+        if (!$d) {
+            $d = ORM::for_table('tbl_appconfig')->create();
+            $d->setting = $key;
+        }
+        
+        $d->value = $value;
         $d->save();
     }
 
@@ -253,12 +226,12 @@ function mpesa_payment_notification()
             
             if (!Package::rechargeUser($user['id'], $trx['routers'], $trx['plan_id'], $trx['gateway'], 'M-Pesa')) {
                 $error_msg = "Failed to activate package\nTransaction ID: $trx_id\n" .
-                            "User: {$user['username']}\nRouter: {$trx['routers']}\n" .
-                            "Plan: {$trx['plan_id']}";
+                            "User: " . (string)$user['username'] . "\nRouter: " . (string)$trx['routers'] . "\n" .
+                            "Plan: " . (string)$trx['plan_id'];
                 _log("M-Pesa Package Activation Error [TRX: $trx_id]: " . $error_msg, 'MPesa');
                 sendTelegram($error_msg);
             } else {
-                _log("M-Pesa Package Activated [TRX: $trx_id] for user {$user['username']}", 'MPesa');
+                _log("M-Pesa Package Activated [TRX: $trx_id] for user " . (string)$user['username'], 'MPesa');
             }
             
             $trx->pg_paid_response = json_encode($result);
