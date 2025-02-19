@@ -92,6 +92,11 @@ function mpesa_create_transaction($trx, $user)
         $phone = '254' . ltrim($phone, '0');
     }
     
+    // Check if transaction already has a gateway_trx_id to prevent duplicate STK pushes
+    if (!empty($trx['gateway_trx_id'])) {
+        r2(U . "order/view/" . $trx['id'], 'w', Lang::T("Payment already initiated. Please check your phone."));
+    }
+    
     $timestamp = date('YmdHis');
     $password = base64_encode($config['mpesa_shortcode'] . $config['mpesa_passkey'] . $timestamp);
     
@@ -128,7 +133,7 @@ function mpesa_create_transaction($trx, $user)
         ->find_one();
     $d->gateway_trx_id = $result['CheckoutRequestID'];
     $d->pg_request = json_encode($result);
-    $d->pg_url_payment = '#'; // Prevent redirect loops
+    $d->pg_url_payment = '#'; // Set to # to prevent redirect loops
     $d->expired_date = date('Y-m-d H:i:s', strtotime('+ 4 HOURS'));
     $d->save();
 
