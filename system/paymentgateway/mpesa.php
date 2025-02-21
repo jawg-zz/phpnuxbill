@@ -13,6 +13,7 @@ final class MPesaConfig {
     public const SUCCESS_CODE = '0';
     public const PAID_STATUS = 2;
     public const PENDING_STATUS = 1;
+    public const EXPIRED_STATUS = 3;
     public const LOG_TYPE = 'MPesa';
     
     private const REQUIRED_CONFIG = [
@@ -71,6 +72,9 @@ function mpesa_save_config(): void {
 
 function mpesa_create_transaction($trx, $user): void {
     try {
+        // Clean up expired transactions first
+        cleanup_expired_transactions();
+        
         // Validate configuration
         MPesaConfig::validate();
         
@@ -128,8 +132,19 @@ function check_pending_transaction(string $username): void {
         ->find_one();
         
     if ($pending) {
+        // First, check if the transaction has actually expired
+        if (strtotime($pending['expired_date']) < time()) {
+            // Update expired transaction status
+            $pending->status = MPesaConfig::EXPIRED_STATUS;
+            $pending->save();
+            return; // Allow new transaction since the old one is expired
+        }
+        
+        // If not expired, provide more detailed error message
+        $minutes_left = ceil((strtotime($pending['expired_date']) - time()) / 60);
         throw new Exception(
-            Lang::T("You have a pending M-Pesa payment. Please complete it or wait for it to expire.")
+            Lang::T("You have a pending M-Pesa payment for order #{$pending['id']}. ") .
+            Lang::T("Please complete it or wait {$minutes_left} minutes for it to expire.")
         );
     }
 }
@@ -523,6 +538,16 @@ function log_status_check($trx, $result): void {
             'result' => $result
         ]
     ]);
+}
+
+function cleanup_expired_transactions(): void {
+    ORM::for_table('tbl_payment_gateway')
+        ->where('status', MPesaConfig::PENDING_STATUS)
+        ->where('gateway', 'mpesa')
+        ->where_lt('expired_date', date('Y-m-d H:i:s'))
+        ->find_result_set()
+        ->set('status', MPesaConfig::EXPIRED_STATUS)
+        ->save();
 }
 
 /**
