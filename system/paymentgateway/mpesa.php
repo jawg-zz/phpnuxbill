@@ -174,27 +174,99 @@ function handle_payment_result($trx, $result, $user = null, $is_status_check = f
     }
 }
 
+/**
+ * Process a successful M-Pesa payment
+ * 
+ * @param ORM $trx Transaction record from tbl_payment_gateway
+ * @param array $user User record from tbl_customers
+ * @param array $result M-Pesa STK Push callback response
+ * @param bool $should_activate Whether to activate the package immediately
+ * @return bool Success status
+ * @throws Exception If payment validation or activation fails
+ */
 function process_payment_success($trx, $user, $result, $should_activate = true): bool {
-    if ($should_activate && !activate_user_package($trx, $user)) {
-        throw new Exception('Failed to activate package');
+    // Verify transaction hasn't been processed
+    if ($trx->status === MPesaConfig::PAID_STATUS) {
+        mpesa_log('payment_duplicate', [
+            'trx' => $trx,
+            'details' => ['message' => 'Transaction already processed']
+        ]);
+        return true;
     }
 
-    update_transaction($trx, [
-        'pg_paid_response' => json_encode($result),
-        'payment_method' => MPesaConfig::PAYMENT_METHOD,
-        'payment_channel' => MPesaConfig::CHANNEL,
-        'paid_date' => date('Y-m-d H:i:s'),
-        'status' => MPesaConfig::PAID_STATUS
-    ]);
+    // Validate M-Pesa payment details
+    $items = $result['CallbackMetadata']['Item'] ?? [];
+    $payment_data = [];
     
-    mpesa_log('payment_success', [
-        'trx' => $trx,
-        'details' => [
-            'user' => $user['username'],
-            'amount' => $trx['price']
-        ]
-    ]);
-    return true;
+    foreach ($items as $item) {
+        $payment_data[$item['Name']] = $item['Value'];
+    }
+
+    // Required fields according to Daraja API
+    $required_fields = ['Amount', 'MpesaReceiptNumber', 'TransactionDate', 'PhoneNumber'];
+    foreach ($required_fields as $field) {
+        if (!isset($payment_data[$field])) {
+            throw new Exception("Missing required M-Pesa field: {$field}");
+        }
+    }
+
+    // Validate payment amount
+    if ((float)$payment_data['Amount'] !== (float)$trx['price']) {
+        throw new Exception("Amount mismatch: Expected {$trx['price']}, got {$payment_data['Amount']}");
+    }
+
+    // Validate phone number format (remove leading + if present)
+    $paid_phone = ltrim($payment_data['PhoneNumber'], '+');
+    $user_phone = ltrim($user['phonenumber'], '+');
+    if ($paid_phone !== $user_phone) {
+        mpesa_log('payment_phone_mismatch', [
+            'trx' => $trx,
+            'details' => [
+                'expected' => $user_phone,
+                'received' => $paid_phone
+            ]
+        ], true);
+        // Continue processing as phone might be different but payment is valid
+    }
+
+    try {
+        // Activate package if required
+        if ($should_activate && !activate_user_package($trx, $user)) {
+            throw new Exception('Package activation failed');
+        }
+
+        // Update transaction with M-Pesa details
+        update_transaction($trx, [
+            'pg_paid_response' => json_encode($result),
+            'payment_method' => MPesaConfig::PAYMENT_METHOD,
+            'payment_channel' => MPesaConfig::CHANNEL,
+            'paid_date' => date('Y-m-d H:i:s'),
+            'status' => MPesaConfig::PAID_STATUS,
+            'gateway_reference' => $payment_data['MpesaReceiptNumber']
+        ]);
+        
+        mpesa_log('payment_success', [
+            'trx' => $trx,
+            'details' => [
+                'user' => $user['username'],
+                'phone' => $user['phonenumber'],
+                'amount' => $payment_data['Amount'],
+                'receipt' => $payment_data['MpesaReceiptNumber'],
+                'date' => $payment_data['TransactionDate']
+            ]
+        ]);
+
+        return true;
+    } catch (Exception $e) {
+        mpesa_log('payment_processing_failed', [
+            'trx' => $trx,
+            'details' => [
+                'error' => $e->getMessage(),
+                'mpesa_data' => $payment_data
+            ]
+        ], true);
+        throw $e;
+    }
 }
 
 // Helper Functions
