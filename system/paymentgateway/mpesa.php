@@ -342,23 +342,36 @@ function mpesa_get_token(): string {
     
     try {
         $credentials = base64_encode($config['mpesa_consumer_key'] . ':' . $config['mpesa_consumer_secret']);
-        $response = Http::postJsonData(
+        $headers = ['Authorization: Basic ' . $credentials];
+        
+        $response = Http::getdata(
             MPesaConfig::getServer() . 'oauth/v1/generate?grant_type=client_credentials',
-            [],
-            ['Authorization: Basic ' . $credentials]
+            $headers
         );
         
-        $result = json_decode($response, true);
-        if (isset($result['access_token'])) {
-            return $result['access_token'];
+        if (empty($response)) {
+            throw new Exception('Empty response from M-Pesa API');
         }
         
-        throw new Exception('Invalid token response: ' . $response);
+        $result = json_decode($response, true);
+        if (!$result) {
+            throw new Exception('Invalid JSON response: ' . $response);
+        }
+        
+        if (!isset($result['access_token'])) {
+            throw new Exception('Access token not found in response: ' . $response);
+        }
+        
+        return $result['access_token'];
     } catch (Exception $e) {
         mpesa_log('token_error', [
-            'details' => ['error' => $e->getMessage()]
+            'details' => [
+                'error' => $e->getMessage(),
+                'consumer_key' => substr($config['mpesa_consumer_key'], 0, 4) . '****',
+                'response' => $response ?? 'none'
+            ]
         ], true);
-        throw $e;
+        throw new Exception('Failed to generate M-Pesa token: ' . $e->getMessage());
     }
 }
 
