@@ -138,8 +138,40 @@
             {if $trx['status']==1}
                 <div class="panel-footer">
                     <div class="btn-group btn-group-justified">
-                        <a href="{$trx['pg_url_payment']}" {if $trx['gateway']=='midtrans'} target="_blank" {/if}
-                            class="btn btn-primary">{Lang::T('Pay Now')}</a>
+                        {if $trx['gateway'] eq 'mpesa'}
+                            <div class="mpesa-payment-section">
+                                <div class="alert alert-info">
+                                    <strong>{Lang::T('Please check your phone')}</strong>
+                                    <p>{Lang::T('Enter your M-Pesa PIN to complete payment')}</p>
+                                </div>
+                                <div class="payment-details">
+                                    <p>{Lang::T('Amount')}: {$_c['currency_code']} {$trx['price']}</p>
+                                    <p>{Lang::T('Phone')}: {$user['phonenumber']}</p>
+                                    <p>{Lang::T('Expires')}: {date($_c['date_format'], strtotime($trx['expired_date']))}
+                                        {date('H:i', strtotime($trx['expired_date']))}</p>
+                                </div>
+                                <div class="btn-group btn-group-justified">
+                                    <a href="{Text::url('order/view/', $trx['id'], '/check')}" 
+                                       class="btn btn-primary" id="checkMpesaStatus">
+                                        {Lang::T('Check Payment Status')}
+                                    </a>
+                                </div>
+                            </div>
+                            <script>
+                                {if $trx['status'] eq '1'}
+                                    // Auto refresh every 30 seconds for pending payments
+                                    setTimeout(function() {
+                                        window.location.reload();
+                                    }, 30000);
+                                {/if}
+                            </script>
+                        {else}
+                            <a href="{$trx['pg_url_payment']}" 
+                               {if $trx['gateway'] eq 'midtrans'} target="_blank" {/if}
+                               class="btn btn-primary">
+                                {Lang::T('Pay Now')}
+                            </a>
+                        {/if}
                         <a href="{Text::url('order/view/', $trx['id'], '/check')}"
                             class="btn btn-info">{Lang::T('Check for Payment')}</a>
                     </div>
