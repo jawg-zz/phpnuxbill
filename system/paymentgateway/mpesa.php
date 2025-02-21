@@ -333,7 +333,7 @@ function process_payment_success($trx, $user, $result, $should_activate = true):
 
     // Validate payment amount
     if ((float)$payment_data['Amount'] !== (float)$trx['price']) {
-        throw new Exception("Amount mismatch: Expected {$trx['price']}, got {$payment_data['Amount']}");
+        throw new Exception("Amount mismatch: Expected " . (string)$trx['price'] . ", got " . (string)$payment_data['Amount']);
     }
 
     // Validate phone number format (remove leading + if present)
@@ -467,7 +467,7 @@ function mpesa_get_token(): string {
             $config['mpesa_consumer_secret']
         );
         
-        $response = Http::get(
+        $response = Http::getData(
             MPesaConfig::getServer() . 'oauth/v1/generate?grant_type=client_credentials',
             ['Authorization: Basic ' . $credentials]
         );
