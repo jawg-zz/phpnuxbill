@@ -140,31 +140,56 @@
                     <div class="btn-group btn-group-justified">
                         {if $trx['gateway'] eq 'mpesa'}
                             <div class="mpesa-payment-section">
-                                <div class="alert alert-info">
-                                    <strong>{Lang::T('Please check your phone')}</strong>
-                                    <p>{Lang::T('Enter your M-Pesa PIN to complete payment')}</p>
-                                </div>
-                                <div class="payment-details">
-                                    <p>{Lang::T('Amount')}: {$_c['currency_code']} {$trx['price']}</p>
-                                    <p>{Lang::T('Phone')}: {$user['phonenumber']}</p>
-                                    <p>{Lang::T('Expires')}: {date($_c['date_format'], strtotime($trx['expired_date']))}
-                                        {date('H:i', strtotime($trx['expired_date']))}</p>
-                                </div>
-                                <div class="btn-group btn-group-justified">
-                                    <a href="{Text::url('order/view/', $trx['id'], '/check')}" 
-                                       class="btn btn-primary" id="checkMpesaStatus">
-                                        {Lang::T('Check Payment Status')}
-                                    </a>
-                                </div>
-                            </div>
-                            <script>
                                 {if $trx['status'] eq '1'}
-                                    // Auto refresh every 30 seconds for pending payments
-                                    setTimeout(function() {
-                                        window.location.reload();
-                                    }, 30000);
+                                    {* Pending Payment *}
+                                    <div class="alert alert-info">
+                                        <strong>{Lang::T('Complete M-Pesa Payment')}</strong>
+                                        <p>{Lang::T('If you have not received the payment prompt:')}</p>
+                                        <ol>
+                                            <li>{Lang::T('Go to M-Pesa Menu')}</li>
+                                            <li>{Lang::T('Select Lipa na M-Pesa')}</li>
+                                            <li>{Lang::T('Select Pay Bill')}</li>
+                                            <li>{Lang::T('Enter Business No')}: {$config['mpesa_shortcode']}</li>
+                                            <li>{Lang::T('Enter Account No')}: {$trx['id']}</li>
+                                            <li>{Lang::T('Enter Amount')}: {$trx['price']}</li>
+                                            <li>{Lang::T('Enter your PIN')}</li>
+                                        </ol>
+                                    </div>
+                                    <div class="payment-details">
+                                        <p><strong>{Lang::T('Amount')}:</strong> {$_c['currency_code']} {$trx['price']}</p>
+                                        <p><strong>{Lang::T('Phone')}:</strong> {$user['phonenumber']}</p>
+                                        <p><strong>{Lang::T('Expires')}:</strong> {date($_c['date_format'], strtotime($trx['expired_date']))} {date('H:i', strtotime($trx['expired_date']))}</p>
+                                    </div>
+                                    <div class="btn-group btn-group-justified mt-3">
+                                        <a href="{Text::url('order/view/', $trx['id'], '/check')}" 
+                                           class="btn btn-primary btn-lg" id="checkMpesaStatus">
+                                            {Lang::T('Check Payment Status')}
+                                        </a>
+                                    </div>
+                                    <script>
+                                        // Auto refresh every 30 seconds for pending payments
+                                        setTimeout(function() {
+                                            window.location.reload();
+                                        }, 30000);
+                                    </script>
+                                {elseif $trx['status'] eq '2'}
+                                    {* Paid *}
+                                    <div class="alert alert-success">
+                                        <strong>{Lang::T('Payment Completed')}</strong>
+                                        <p>{Lang::T('Transaction ID')}: {$trx['gateway_reference']}</p>
+                                        <p>{Lang::T('Paid on')}: {date($_c['date_format'], strtotime($trx['paid_date']))} {date('H:i', strtotime($trx['paid_date']))}</p>
+                                    </div>
+                                {else}
+                                    {* Failed/Expired *}
+                                    <div class="alert alert-danger">
+                                        <strong>{Lang::T('Payment Failed or Expired')}</strong>
+                                        <p>{Lang::T('Please try again or choose another payment method')}</p>
+                                    </div>
+                                    <a href="{Text::url('order/package')}" class="btn btn-primary">
+                                        {Lang::T('Try Again')}
+                                    </a>
                                 {/if}
-                            </script>
+                            </div>
                         {else}
                             <a href="{$trx['pg_url_payment']}" 
                                {if $trx['gateway'] eq 'midtrans'} target="_blank" {/if}
