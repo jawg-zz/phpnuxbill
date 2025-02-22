@@ -203,33 +203,97 @@ function find_transaction($result): ?ORM {
 
 function handle_payment_result($trx, $result, $user): void {
     try {
+        // First check if transaction is already processed
+        if ($trx['status'] == MPesaConfig::PAID_STATUS) {
+            mpesa_log('payment_already_processed', [
+                'trx_id' => $trx['id'],
+                'user' => $user['username']
+            ]);
+            return;
+        }
+
         if ($result['ResultCode'] === 0) {
-            process_successful_payment($trx, $user, $result);
+            // Extract payment details from callback
+            $payment_details = $result['CallbackMetadata']['Item'];
+            $amount = null;
+            $mpesa_receipt = null;
+            
+            // Extract Amount and Receipt Number
+            foreach ($payment_details as $item) {
+                if ($item['Name'] === 'Amount') $amount = $item['Value'];
+                if ($item['Name'] === 'MpesaReceiptNumber') $mpesa_receipt = $item['Value'];
+            }
+
+            // Verify payment amount matches transaction amount
+            if ($amount != $trx['price']) {
+                throw new Exception("Payment amount mismatch. Expected: {$trx['price']}, Received: {$amount}");
+            }
+
+            // First update transaction status
+            update_transaction($trx, [
+                'status' => MPesaConfig::PAID_STATUS,
+                'pg_paid_response' => json_encode($result),
+                'paid_date' => date('Y-m-d H:i:s'),
+                'payment_method' => MPesaConfig::PAYMENT_METHOD,
+                'payment_channel' => MPesaConfig::CHANNEL,
+                'gateway_trx_id' => $mpesa_receipt
+            ]);
+
+            // Then proceed with package subscription
+            if (!Package::rechargeUser(
+                $user['id'], 
+                $trx['routers'], 
+                $trx['plan_id'], 
+                $trx['gateway'], 
+                MPesaConfig::CHANNEL
+            )) {
+                throw new Exception("Payment successful but failed to activate package");
+            }
+            
+            // Log successful payment
+            mpesa_log('payment_successful', [
+                'trx_id' => $trx['id'],
+                'user' => $user['username'],
+                'amount' => $amount,
+                'receipt' => $mpesa_receipt
+            ]);
+
+            Message::sendTelegram(
+                "Payment Received from M-Pesa\n" .
+                "Amount: {$amount}\n" .
+                "Receipt: {$mpesa_receipt}\n" .
+                "Customer: {$user['fullname']}\n" .
+                "Transaction ID: {$trx['id']}"
+            );
         } else {
+            // Handle failed payment
             update_transaction($trx, [
                 'status' => MPesaConfig::FAILED_STATUS,
-                'pg_response' => json_encode($result)
+                'pg_paid_response' => json_encode($result)
+            ]);
+
+            mpesa_log('payment_failed', [
+                'trx_id' => $trx['id'],
+                'user' => $user['username'],
+                'result_code' => $result['ResultCode'],
+                'result_desc' => $result['ResultDesc']
             ]);
         }
     } catch (Exception $e) {
         mpesa_log('payment_processing_error', [
             'trx' => $trx,
             'details' => ['error' => $e->getMessage()]
+        ], true);
+        
+        // Ensure transaction is marked as failed in case of errors
+        update_transaction($trx, [
+            'status' => MPesaConfig::FAILED_STATUS,
+            'pg_paid_response' => json_encode([
+                'error' => $e->getMessage(),
+                'original_result' => $result
+            ])
         ]);
     }
-}
-
-function process_successful_payment($trx, $user, $result): void {
-    update_transaction($trx, [
-        'status' => MPesaConfig::PAID_STATUS,
-        'pg_response' => json_encode($result)
-    ]);
-    
-    if (!Package::rechargeUser($user['id'], $trx['routers'], $trx['plan_id'], $trx['gateway'], MPesaConfig::CHANNEL)) {
-        throw new Exception("Failed to activate package");
-    }
-    
-    Message::sendTelegram("Payment Received from M-Pesa: Amount " . $trx['price'] . " from " . $user['fullname']);
 }
 
 function update_transaction($trx, array $data): void {
