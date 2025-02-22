@@ -56,6 +56,7 @@ $UPLOAD_PATH = $root_path . File::pathFixer('system/uploads');
 $CACHE_PATH = $root_path . File::pathFixer('system/cache');
 $PAGES_PATH = $root_path . File::pathFixer('pages');
 $PLUGIN_PATH = $root_path . File::pathFixer('system/plugin');
+$WIDGET_PATH = $root_path . File::pathFixer('system/widgets');
 $PAYMENTGATEWAY_PATH = $root_path . File::pathFixer('system/paymentgateway');
 $UI_PATH = 'ui';
 
@@ -111,6 +112,11 @@ $result = ORM::for_table('tbl_appconfig')->find_many();
 foreach ($result as $value) {
     $config[$value['setting']] = $value['value'];
 }
+
+if(empty($config['dashboard_cr'])){
+    $config['dashboard_cr'] = "12.7,5.12";
+}
+
 $_c =  $config;
 if (empty($http_proxy) && !empty($config['http_proxy'])) {
     $http_proxy = $config['http_proxy'];

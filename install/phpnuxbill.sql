@@ -277,6 +277,18 @@ CREATE TABLE IF NOT EXISTS  `tbl_coupons` (
     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+CREATE TABLE IF NOT EXISTS `tbl_widgets` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `orders` int NOT NULL DEFAULT '99',
+  `position` tinyint(1) NOT NULL DEFAULT '1' COMMENT '1. top 2. left 3. right 4. bottom',
+  `enabled` tinyint(1) NOT NULL DEFAULT '1',
+  `title` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `widget` varchar(64) COLLATE utf8mb4_general_ci NOT NULL DEFAULT '',
+  `content` text COLLATE utf8mb4_general_ci NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+COMMIT;
+
 ALTER TABLE `rad_acct`
   ADD PRIMARY KEY (`id`),
   ADD KEY `username` (`username`),
@@ -397,3 +409,16 @@ VALUES (
         '2022-09-06 16:09:50',
         '2014-06-23 01:43:07'
     );
+
+INSERT INTO `tbl_widgets` (`id`, `orders`, `position`, `enabled`, `title`, `widget`, `content`) VALUES
+(1, 1, 1, 1, 'Top Widget', 'top_widget', ''),
+(2, 2, 1, 1, 'Default Info', 'default_info_row', ''),
+(3, 1, 2, 1, 'Graph Monthly Registered Customers', 'graph_monthly_registered_customers', ''),
+(4, 2, 2, 1, 'Graph Monthly Sales', 'graph_monthly_sales', ''),
+(5, 3, 2, 1, 'Voucher Stocks', 'voucher_stocks', ''),
+(6, 4, 2, 1, 'Customer Expired', 'customer_expired', ''),
+(7, 1, 3, 1, 'Cron Monitor', 'cron_monitor', ''),
+(8, 2, 3, 1, 'Mikrotik Cron Monitor', 'mikrotik_cron_monitor', ''),
+(9, 3, 3, 1, 'Info Payment Gateway', 'info_payment_gateway', ''),
+(10, 4, 3, 1, 'Graph Customers Insight', 'graph_customers_insight', ''),
+(11, 5, 3, 1, 'Activity Log', 'activity_log', '');
