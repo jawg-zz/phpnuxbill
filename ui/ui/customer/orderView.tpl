@@ -140,27 +140,33 @@
                     <div class="btn-group btn-group-justified">
                         {if $trx['gateway'] eq 'mpesa'}
                             <div class="mpesa-payment-section">
-                                {if $trx['status'] eq '1'}
+                                {if $trx['status'] eq 'initiated'}
+                                    <div class="alert alert-info">
+                                        <strong>{Lang::T('Payment Instructions')}:</strong>
+                                        <ol>
+                                            <li>{Lang::T('You will receive an STK Push on your phone')}</li>
+                                            <li>{Lang::T('Enter your M-Pesa PIN to complete payment')}</li>
+                                            <li>{Lang::T('Wait for confirmation message')}</li>
+                                        </ol>
+                                    </div>
                                     <form method="POST" action="{$_url}order/buy/{$plan['id']}/{$router['id']}">
                                         <input type="hidden" name="gateway" value="mpesa">
-                                        <button type="submit" class="btn btn-primary">
-                                            {Lang::T('Pay Now')}
+                                        <button type="submit" class="btn btn-primary btn-lg btn-block">
+                                            {Lang::T('Retry Payment')} - {Lang::moneyFormat($trx['price'])}
                                         </button>
                                     </form>
-                                {elseif $trx['status'] eq '2'}
-                                    {* Paid *}
+                                {elseif $trx['status'] eq 'paid'}
                                     <div class="alert alert-success">
                                         <strong>{Lang::T('Payment Completed')}</strong>
                                         <p>{Lang::T('Transaction ID')}: {$trx['gateway_reference']}</p>
                                         <p>{Lang::T('Paid on')}: {date($_c['date_format'], strtotime($trx['paid_date']))} {date('H:i', strtotime($trx['paid_date']))}</p>
                                     </div>
                                 {else}
-                                    {* Failed/Expired *}
                                     <div class="alert alert-danger">
-                                        <strong>{Lang::T('Payment Failed or Expired')}</strong>
+                                        <strong>{Lang::T('Payment Failed')}</strong>
                                         <p>{Lang::T('Please try again or choose another payment method')}</p>
                                     </div>
-                                    <a href="{Text::url('order/package')}" class="btn btn-primary">
+                                    <a href="{$_url}order/package" class="btn btn-primary">
                                         {Lang::T('Try Again')}
                                     </a>
                                 {/if}

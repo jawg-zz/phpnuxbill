@@ -6,14 +6,12 @@ declare(strict_types=1);
  * Payment Gateway M-Pesa
  **/
 
-// Constants
 final class MPesaConfig {
     public const PAYMENT_METHOD = 'M-Pesa';
     public const CHANNEL = 'STK Push';
     public const SUCCESS_CODE = '0';
     public const PAID_STATUS = 2;
-    public const PENDING_STATUS = 1;
-    public const EXPIRED_STATUS = 3;
+    public const FAILED_STATUS = 3;
     public const LOG_TYPE = 'MPesa';
     
     private const REQUIRED_CONFIG = [
@@ -40,7 +38,6 @@ final class MPesaConfig {
     }
 }
 
-// Main Gateway Functions
 function mpesa_show_config(): void {
     global $ui;
     $ui->assign('_title', 'M-Pesa - Payment Gateway');
@@ -72,28 +69,12 @@ function mpesa_save_config(): void {
 
 function mpesa_create_transaction($trx, $user): void {
     try {
-        // Clean up expired transactions first
-        cleanup_expired_transactions();
-        
-        // Validate configuration
         MPesaConfig::validate();
-        
-        // Validate phone number
         $phone = validate_phone_number($user['phonenumber']);
-        
-        // Check for pending transaction
-        check_pending_transaction($user['username']);
-        
-        // Create STK Push request
         $stk_request = create_stk_push_request($trx, $phone);
-        
-        // Send STK Push
         $result = send_stk_push($stk_request);
-        
-        // Update transaction
         save_transaction_details($trx, $result);
         
-        // Redirect to order view
         r2(U . "order/view/" . $trx['id'], 's', 
             Lang::T("Please check your phone to complete payment"));
             
@@ -112,41 +93,13 @@ function mpesa_create_transaction($trx, $user): void {
 }
 
 function validate_phone_number(string $phone): string {
-    // Remove any spaces, dashes, or plus signs
     $phone = preg_replace('/[\s+-]/', '', $phone);
     
-    // Ensure it starts with 254
     if (!preg_match('/^254\d{9}$/', $phone)) {
         throw new Exception(Lang::T("Invalid phone number format. Must be 254XXXXXXXXX"));
     }
     
     return $phone;
-}
-
-function check_pending_transaction(string $username): void {
-    $pending = ORM::for_table('tbl_payment_gateway')
-        ->where('username', $username)
-        ->where('status', MPesaConfig::PENDING_STATUS)
-        ->where('gateway', 'mpesa')
-        ->where_gt('expired_date', date('Y-m-d H:i:s'))
-        ->find_one();
-        
-    if ($pending) {
-        // First, check if the transaction has actually expired
-        if (strtotime($pending['expired_date']) < time()) {
-            // Update expired transaction status
-            $pending->status = MPesaConfig::EXPIRED_STATUS;
-            $pending->save();
-            return; // Allow new transaction since the old one is expired
-        }
-        
-        // If not expired, provide more detailed error message
-        $minutes_left = ceil((strtotime($pending['expired_date']) - time()) / 60);
-        throw new Exception(
-            Lang::T("You have a pending M-Pesa payment for order #{$pending['id']}. ") .
-            Lang::T("Please complete it or wait {$minutes_left} minutes for it to expire.")
-        );
-    }
 }
 
 function create_stk_push_request($trx, string $phone): array {
@@ -196,11 +149,10 @@ function save_transaction_details($trx, array $result): void {
     update_transaction($trx, [
         'gateway_trx_id' => $result['CheckoutRequestID'],
         'pg_request' => json_encode($result),
-        'expired_date' => date('Y-m-d H:i:s', strtotime('+ 4 HOURS')),
         'gateway' => 'mpesa',
         'payment_method' => MPesaConfig::PAYMENT_METHOD,
         'payment_channel' => MPesaConfig::CHANNEL,
-        'status' => MPesaConfig::PENDING_STATUS
+        'status' => MPesaConfig::FAILED_STATUS // Default to failed until success callback
     ]);
 }
 
@@ -209,20 +161,16 @@ function mpesa_payment_notification(): void {
         $callback = process_callback_input();
         $result = $callback['Body']['stkCallback'];
         
-        // Find transaction
         $trx = find_transaction($result);
         if (!$trx) {
-            debug_transaction_search($result);
             throw new Exception('Transaction not found');
         }
         
-        // Get user
         $user = ORM::for_table('tbl_customers')->find_one($trx['user_id']);
         if (!$user) {
             throw new Exception('User not found');
         }
         
-        // Process payment
         handle_payment_result($trx, $result, $user);
         
     } catch (Exception $e) {
@@ -235,192 +183,13 @@ function mpesa_payment_notification(): void {
     }
 }
 
-function mpesa_get_status($trx, $user): void {
-    try {
-        $result = check_transaction_status($trx);
-        log_status_check($trx, $result);
-        handle_payment_result($trx, $result, $user, true);
-    } catch (Exception $e) {
-        mpesa_log('status_check_failed', [
-            'trx' => $trx,
-            'details' => ['error' => $e->getMessage()]
-        ]);
-        r2(U . "order/view/" . $trx['id'], 'w', 
-            Lang::T("Failed to check payment status. Please try again."));
-    }
-}
-
-function check_transaction_status($trx): array {
-    global $config;
-    
-    $timestamp = date('YmdHis');
-    $password = base64_encode(
-        $config['mpesa_shortcode'] . 
-        $config['mpesa_passkey'] . 
-        $timestamp
-    );
-
-    $request = [
-        'BusinessShortCode' => $config['mpesa_shortcode'],
-        'Password' => $password,
-        'Timestamp' => $timestamp,
-        'CheckoutRequestID' => $trx['gateway_trx_id']
-    ];
-
-    $token = mpesa_get_token();
-    return send_mpesa_request(
-        'mpesa/stkpushquery/v1/query',
-        $request,
-        ['Authorization: Bearer ' . $token]
-    );
-}
-
-// Payment Processing Functions
-function handle_payment_result($trx, $result, $user = null, $is_status_check = false): bool {
-    try {
-        if ($result['ResultCode'] === 0) {
-            if (!$user) {
-                $user = ORM::for_table('tbl_customers')->find_one($trx['user_id']);
-                if (!$user) {
-                    throw new Exception('User not found');
-                }
-            }
-
-            $success = process_payment_success($trx, $user, $result, !$is_status_check);
-            
-            if ($is_status_check) {
-                $message = $success 
-                    ? ['s', Lang::T("Transaction has been paid.")] 
-                    : ['d', Lang::T("Failed to activate your Package, try again later.")];
-                r2(U . "order/view/" . $trx['id'], ...$message);
-            }
-            
-            return $success;
-        }
-
-        throw new Exception(json_encode($result));
-    } catch (Exception $e) {
-        log_payment_failure($trx, $user, ['error' => $e->getMessage()]);
-        
-        if ($is_status_check) {
-            r2(U . "order/view/" . $trx['id'], 'w', Lang::T("Transaction still unpaid"));
-        }
-        
-        return false;
-    }
-}
-
-/**
- * Process a successful M-Pesa payment
- * 
- * @param ORM $trx Transaction record from tbl_payment_gateway
- * @param array $user User record from tbl_customers
- * @param array $result M-Pesa STK Push callback response
- * @param bool $should_activate Whether to activate the package immediately
- * @return bool Success status
- * @throws Exception If payment validation or activation fails
- */
-function process_payment_success($trx, $user, $result, $should_activate = true): bool {
-    // Verify transaction hasn't been processed
-    if ($trx->status === MPesaConfig::PAID_STATUS) {
-        mpesa_log('payment_duplicate', [
-            'trx' => $trx,
-            'details' => ['message' => 'Transaction already processed']
-        ]);
-        return true;
-    }
-
-    // Validate M-Pesa payment details
-    $items = $result['CallbackMetadata']['Item'] ?? [];
-    $payment_data = [];
-    
-    foreach ($items as $item) {
-        $payment_data[$item['Name']] = $item['Value'];
-    }
-
-    // Required fields according to Daraja API
-    $required_fields = ['Amount', 'MpesaReceiptNumber', 'TransactionDate', 'PhoneNumber'];
-    foreach ($required_fields as $field) {
-        if (!isset($payment_data[$field])) {
-            throw new Exception("Missing required M-Pesa field: {$field}");
-        }
-    }
-
-    // Validate payment amount
-    if ((float)$payment_data['Amount'] !== (float)$trx['price']) {
-        throw new Exception("Amount mismatch: Expected " . (string)$trx['price'] . ", got " . (string)$payment_data['Amount']);
-    }
-
-    // Validate phone number format (remove leading + if present)
-    $paid_phone = ltrim($payment_data['PhoneNumber'], '+');
-    $user_phone = ltrim($user['phonenumber'], '+');
-    if ($paid_phone !== $user_phone) {
-        mpesa_log('payment_phone_mismatch', [
-            'trx' => $trx,
-            'details' => [
-                'expected' => $user_phone,
-                'received' => $paid_phone
-            ]
-        ], true);
-        // Continue processing as phone might be different but payment is valid
-    }
-
-    try {
-        // Activate package if required
-        if ($should_activate && !activate_user_package($trx, $user)) {
-            throw new Exception('Package activation failed');
-        }
-
-        // Update transaction with M-Pesa details
-        update_transaction($trx, [
-            'pg_paid_response' => json_encode($result),
-            'payment_method' => MPesaConfig::PAYMENT_METHOD,
-            'payment_channel' => MPesaConfig::CHANNEL,
-            'paid_date' => date('Y-m-d H:i:s'),
-            'status' => MPesaConfig::PAID_STATUS,
-            'gateway_reference' => $payment_data['MpesaReceiptNumber']
-        ]);
-        
-        mpesa_log('payment_success', [
-            'trx' => $trx,
-            'details' => [
-                'user' => $user['username'],
-                'phone' => $user['phonenumber'],
-                'amount' => $payment_data['Amount'],
-                'receipt' => $payment_data['MpesaReceiptNumber'],
-                'date' => $payment_data['TransactionDate']
-            ]
-        ]);
-
-        return true;
-    } catch (Exception $e) {
-        mpesa_log('payment_processing_failed', [
-            'trx' => $trx,
-            'details' => [
-                'error' => $e->getMessage(),
-                'mpesa_data' => $payment_data
-            ]
-        ], true);
-        throw $e;
-    }
-}
-
-// Helper Functions
 function process_callback_input(): ?array {
     $input = file_get_contents('php://input');
-    mpesa_log('callback_received', [
-        'details' => ['raw_input' => $input]
-    ]);
+    mpesa_log('callback_received', ['details' => ['raw_input' => $input]]);
     
     $callback = json_decode($input, true);
-    
     if (!isset($callback['Body']['stkCallback'])) {
         throw new Exception('Invalid callback format');
-    }
-    
-    $result = $callback['Body']['stkCallback'];
-    if (!isset($result['BillRefNumber']) || empty($result['BillRefNumber'])) {
-        throw new Exception('Missing or empty BillRefNumber');
     }
     
     return $callback;
@@ -428,11 +197,39 @@ function process_callback_input(): ?array {
 
 function find_transaction($result): ?ORM {
     return ORM::for_table('tbl_payment_gateway')
-        ->where_any_is([
-            ['id' => $result['BillRefNumber']],
-            ['gateway_trx_id' => $result['CheckoutRequestID'] ?? null]
-        ])
+        ->where('gateway_trx_id', $result['CheckoutRequestID'])
         ->find_one();
+}
+
+function handle_payment_result($trx, $result, $user): void {
+    try {
+        if ($result['ResultCode'] === 0) {
+            process_successful_payment($trx, $user, $result);
+        } else {
+            update_transaction($trx, [
+                'status' => MPesaConfig::FAILED_STATUS,
+                'pg_response' => json_encode($result)
+            ]);
+        }
+    } catch (Exception $e) {
+        mpesa_log('payment_processing_error', [
+            'trx' => $trx,
+            'details' => ['error' => $e->getMessage()]
+        ]);
+    }
+}
+
+function process_successful_payment($trx, $user, $result): void {
+    update_transaction($trx, [
+        'status' => MPesaConfig::PAID_STATUS,
+        'pg_response' => json_encode($result)
+    ]);
+    
+    if (!Package::rechargeUser($user['id'], $trx['routers'], $trx['plan_id'], $trx['gateway'], MPesaConfig::CHANNEL)) {
+        throw new Exception("Failed to activate package");
+    }
+    
+    Message::sendTelegram("Payment Received from M-Pesa: Amount " . $trx['price'] . " from " . $user['fullname']);
 }
 
 function update_transaction($trx, array $data): void {
@@ -440,37 +237,6 @@ function update_transaction($trx, array $data): void {
         $trx->$key = $value;
     }
     $trx->save();
-}
-
-function log_payment_failure($trx, $user = null, $result = null): void {
-    $details = ['transaction_id' => $trx['id']];
-    
-    if ($user) {
-        $details += [
-            'user' => $user['username'],
-            'phone' => $user['phonenumber'],
-            'amount' => $trx['price']
-        ];
-    }
-
-    if ($result) {
-        $details['response'] = $result;
-    }
-
-    mpesa_log('payment_failed', [
-        'trx' => $trx,
-        'details' => $details
-    ], true);
-}
-
-function activate_user_package($trx, $user): bool {
-    return Package::rechargeUser(
-        $user['id'], 
-        $trx['routers'], 
-        $trx['plan_id'], 
-        $trx['gateway'], 
-        MPesaConfig::PAYMENT_METHOD
-    );
 }
 
 function mpesa_get_token(): string {
@@ -519,79 +285,9 @@ function send_mpesa_request(string $endpoint, array $data, array $headers): arra
     return $result;
 }
 
-function debug_transaction_search($result): void {
-    mpesa_log('transaction_not_found', [
-        'details' => [
-            'bill_reference' => $result['BillRefNumber'],
-            'checkout_request_id' => $result['CheckoutRequestID'] ?? 'none',
-            'search_query' => ORM::for_table('tbl_payment_gateway')
-                ->where('id', $result['BillRefNumber'])
-                ->build_select()
-        ]
-    ], true);
-}
-
-function log_status_check($trx, $result): void {
-    mpesa_log('status_check', [
-        'trx' => $trx,
-        'details' => [
-            'result' => $result
-        ]
-    ]);
-}
-
-function cleanup_expired_transactions(): void {
-    ORM::for_table('tbl_payment_gateway')
-        ->where('status', MPesaConfig::PENDING_STATUS)
-        ->where('gateway', 'mpesa')
-        ->where_lt('expired_date', date('Y-m-d H:i:s'))
-        ->find_result_set()
-        ->set('status', MPesaConfig::EXPIRED_STATUS)
-        ->save();
-}
-
-/**
- * Unified logging function for M-Pesa operations that follows PSR-3 logging standards
- * 
- * @param string $message_key Predefined message key or custom message
- * @param array $context Additional context data following PSR-3 context standards
- * @param bool $notify Whether to send Telegram notification
- * @return string The formatted log message
- */
-function mpesa_log($message_key, array $context = [], bool $notify = false): string {
-    // Predefined messages for consistency
-    $messages = [
-        'transaction_not_found' => 'Transaction not found in database',
-        'status_check' => 'M-Pesa Status Check',
-        'payment_success' => 'Payment successful',
-        'payment_failed' => 'Payment failed',
-        'request_error' => 'API request error',
-        'token_error' => 'Failed to generate M-Pesa token',
-        'callback_received' => 'M-Pesa callback received',
-        'callback_error' => 'Error processing M-Pesa callback',
-        'transaction_created' => 'New M-Pesa transaction created',
-        'config_updated' => 'M-Pesa configuration updated'
-    ];
-    
-    $base_message = $messages[$message_key] ?? $message_key;
-    
-    // Format transaction ID if present
-    $trx_id = $context['trx']['id'] ?? ($context['trx_id'] ?? null);
-    $trx_prefix = $trx_id ? "[TRX: $trx_id] " : '';
-    
-    // Build message with context
-    $log_message = $trx_prefix . $base_message;
-    if (!empty($context['details'])) {
-        $log_message .= "\n" . Log::arrayToText($context['details']);
+function mpesa_log($action, array $data, bool $admin_notify = false): void {
+    Log::put($action, MPesaConfig::LOG_TYPE, 0, json_encode($data));
+    if ($admin_notify) {
+        sendTelegram("M-Pesa $action\n\n" . json_encode($data, JSON_PRETTY_PRINT));
     }
-
-    // Log to system using standard _log function
-    _log($log_message, MPesaConfig::LOG_TYPE);
-
-    // Optional Telegram notification
-    if ($notify) {
-        Message::sendTelegram($log_message);
-    }
-
-    return $log_message;
 }
