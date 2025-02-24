@@ -355,3 +355,43 @@ function mpesa_log($action, array $data, bool $admin_notify = false): void {
         sendTelegram("M-Pesa $action\n\n" . json_encode($data, JSON_PRETTY_PRINT));
     }
 }
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = $_POST['action'] ?? '';
+    
+    switch ($action) {
+        case 'create_transaction':
+            $plan = ORM::for_table('tbl_plans')->find_one($_POST['plan_id']);
+            if (!$plan) {
+                r2(U . 'order/package', 'e', Lang::T("Plan not found"));
+            }
+
+            // Create transaction record
+            $trx = ORM::for_table('tbl_payment_gateway')->create();
+            $trx->plan_id = $_POST['plan_id'];
+            $trx->plan_name = $plan['name_plan'];
+            $trx->price = $plan['price'];
+            $trx->phone_number = $_POST['phone_number'];
+            $trx->gateway = 'mpesa';
+            $trx->status = 1; // Pending
+            $trx->save();
+
+            // Create user array for mpesa function
+            $user = ['phonenumber' => $_POST['phone_number']];
+            
+            // Initiate M-Pesa payment
+            mpesa_create_transaction($trx, $user);
+            break;
+
+        case 'get_status':
+            $trx = ORM::for_table('tbl_payment_gateway')
+                ->find_one($_POST['order_id']);
+            if (!$trx) {
+                r2(U . 'order/package', 'e', Lang::T("Transaction not found"));
+            }
+
+            $user = ['phonenumber' => $trx['phone_number']];
+            mpesa_get_status($trx, $user);
+            break;
+    }
+}
