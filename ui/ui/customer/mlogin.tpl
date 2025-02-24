@@ -22,7 +22,7 @@
                     <i class="fas fa-spider text-3xl text-orange-500"></i>
                     <h1 class="text-2xl font-bold text-gray-800">Spidmax WiFi</h1>
                 </div>
-                <p class="text-sm text-gray-600">Connected IP: {$_SESSION['nux-ip']}</p>
+                <p class="text-sm text-gray-600">Connected IP: {$smarty.get['nux-ip']}</p>
             </div>
 
             <!-- Login Form with Phone Input -->
@@ -133,11 +133,11 @@
                 <div class="mt-6 pt-4 border-t border-gray-200 text-sm text-gray-600">
                     <div class="flex justify-between mb-2">
                         <span>MAC Address:</span>
-                        <span class="font-mono">{$_SESSION['nux-mac']}</span>
+                        <span class="font-mono">{$smarty.get['nux-mac']}</span>
                     </div>
                     <div class="flex justify-between">
                         <span>IP Address:</span>
-                        <span class="font-mono">{$_SESSION['nux-ip']}</span>
+                        <span class="font-mono">{$smarty.get['nux-ip']}</span>
                     </div>
                 </div>
             </form>
