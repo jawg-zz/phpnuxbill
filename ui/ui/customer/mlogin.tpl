@@ -22,15 +22,15 @@
                     <i class="fas fa-spider text-3xl text-orange-500"></i>
                     <h1 class="text-2xl font-bold text-gray-800">Spidmax WiFi</h1>
                 </div>
-                <p class="text-sm text-gray-600">Connected IP: $(ip)</p>
+                <p class="text-sm text-gray-600">Connected IP: {$_SESSION['nux-ip']}</p>
             </div>
 
             <!-- Login Form with Phone Input -->
-            <form name="login" action="$(link-login-only)" method="post" $(if chap-id) onsubmit="return doLogin()" $(endif) class="space-y-4">
+            <form name="login" action="{$_GET['link-login']}" method="post" $(if chap-id) onsubmit="return doLogin()" $(endif) class="space-y-4">
                 <div id="loginError" class="hidden mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm"></div>
                 
                 <!-- Mikrotik required hidden fields -->
-                <input type="hidden" name="dst" value="$(link-orig)">
+                <input type="hidden" name="dst" value="{$_GET['link-orig']}">
                 <input type="hidden" name="username" id="username">
                 <input type="hidden" name="password" id="password">
                 <input type="hidden" name="popup" value="true">
@@ -133,11 +133,11 @@
                 <div class="mt-6 pt-4 border-t border-gray-200 text-sm text-gray-600">
                     <div class="flex justify-between mb-2">
                         <span>MAC Address:</span>
-                        <span class="font-mono">$(mac)</span>
+                        <span class="font-mono">{$_SESSION['nux-mac']}</span>
                     </div>
                     <div class="flex justify-between">
                         <span>IP Address:</span>
-                        <span class="font-mono">$(ip)</span>
+                        <span class="font-mono">{$_SESSION['nux-ip']}</span>
                     </div>
                 </div>
             </form>
