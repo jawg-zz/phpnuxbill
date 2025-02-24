@@ -155,7 +155,6 @@
     $(endif)
 
     <!-- Application scripts -->
-    <script src="{$app_url}/ui/ui/customer/js/main.js"></script>
     <script src="{$app_url}/ui/ui/customer/js/login.js"></script>
 
     <!-- Initialize variables -->
