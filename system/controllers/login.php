@@ -22,11 +22,25 @@ if (isset($routes['1'])) {
 
 switch ($do) {
     case 'mlogin':
+        // Always show mlogin.tpl for this route
         run_hook('customer_view_mlogin'); #HOOK
         $csrf_token = Csrf::generateAndStoreToken();
         $ui->assign('csrf_token', $csrf_token);
         $ui->assign('_title', Lang::T('Login'));
         $ui->display('customer/mlogin.tpl');
+        break;
+
+    case 'login-display':
+        // If hotspot parameters are present, redirect to mlogin
+        if (isset($_GET['nux-mac']) && isset($_GET['nux-ip'])) {
+            r2(getUrl('login/mlogin'));
+        }
+        // Otherwise show regular login
+        run_hook('customer_view_login'); #HOOK
+        $csrf_token = Csrf::generateAndStoreToken();
+        $ui->assign('csrf_token', $csrf_token);
+        $ui->assign('_title', Lang::T('Login'));
+        $ui->display('customer/login.tpl');
         break;
 
     case 'post':
