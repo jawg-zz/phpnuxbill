@@ -11,7 +11,10 @@ if(Admin::getID()){
     //r2(getUrl('home'));
     $handler = 'home';
 }else{
-    //r2(getUrl('login'));
+    // Check if it's a hotspot login attempt
+    if (isset($_GET['nux-mac']) && isset($_GET['nux-ip'])) {
+        r2(getUrl('login/mlogin')); // Redirect to mlogin for hotspot users
+    }
     $handler = 'login';
 }
 include($root_path . File::pathFixer('system/controllers/' . $handler . '.php'));

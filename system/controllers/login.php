@@ -313,6 +313,10 @@ switch ($do) {
             }
         }
     default:
+        // Change this to redirect to mlogin for hotspot users
+        if (isset($_GET['nux-mac']) && isset($_GET['nux-ip'])) {
+            r2(getUrl('login/mlogin')); // Redirect to mlogin for hotspot users
+        }
         run_hook('customer_view_login'); #HOOK
         $csrf_token = Csrf::generateAndStoreToken();
         if ($config['disable_registration'] == 'yes') {
