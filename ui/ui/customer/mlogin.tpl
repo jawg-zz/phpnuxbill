@@ -150,9 +150,17 @@
     <script src="https://cdn.tailwindcss.com"></script>
 
     <!-- Authentication libraries -->
-    $(if chap-id)
-    <script type="text/javascript" src="{$app_url}/ui/ui/scripts/md5.js"></script>
-    $(endif)
+    <script>
+        // Check if CHAP parameters exist in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const chapKey = urlParams.get('nux-key');
+        if (chapKey) {
+            const script = document.createElement('script');
+            script.src = "{$app_url}/ui/ui/scripts/md5.js";
+            script.type = 'text/javascript';
+            document.head.appendChild(script);
+        }
+    </script>
 
     <!-- Application scripts -->
     <script src="{$app_url}/ui/ui/customer/js/login.js"></script>
