@@ -1,10 +1,14 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta http-equiv="refresh" content="0; url=https://netbill.spidmax.com/login?mac=$mac&amp;ip=$ip&amp;chap-id=$chap-id&amp;chap-challenge=$chap-challenge&amp;dst=$dst">
-    <title>Redirecting...</title>
+    <title>...</title>
+    <meta http-equiv="refresh" content="0; url=https://netbill.spidmax.com/?_route=mlogin&nux-mac=$(mac)&nux-ip=$(ip)&nux-key=$(chap-id)-$(chap-challenge)&nux-hostname=$(hostname)&username=$(username)&error=$(error)&link-login=$(link-login-only)&link-orig=$(link-orig)&dst=$(link-orig-esc)">
+    <meta http-equiv="pragma" content="no-cache">
+    <meta http-equiv="expires" content="-1">
 </head>
 <body>
-    <p>Redirecting to login page...</p>
+    <h1>Redirecting...</h1>
 </body>
 </html>
+
+

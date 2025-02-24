@@ -21,6 +21,14 @@ if (isset($routes['1'])) {
 }
 
 switch ($do) {
+    case 'mlogin':
+        run_hook('customer_view_mlogin'); #HOOK
+        $csrf_token = Csrf::generateAndStoreToken();
+        $ui->assign('csrf_token', $csrf_token);
+        $ui->assign('_title', Lang::T('Login'));
+        $ui->display('customer/mlogin.tpl');
+        break;
+
     case 'post':
         $username = _post('username');
         $password = _post('password');
