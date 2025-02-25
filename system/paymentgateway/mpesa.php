@@ -1,38 +1,38 @@
 <?php
-declare(strict_types=1);
 
 /**
- * PHP Mikrotik Billing (https://github.com/hotspotbilling/phpnuxbill/)
- * Payment Gateway M-Pesa
+ *  PHP Mikrotik Billing (https://github.com/hotspotbilling/phpnuxbill/)
+ *  by https://t.me/ibnux
  **/
 
-final class MPesaConfig {
-    public const PAYMENT_METHOD = 'M-Pesa';
-    public const CHANNEL = 'STK Push';
-    public const SUCCESS_CODE = '0';
-    public const PAID_STATUS = 2;
-    public const FAILED_STATUS = 3;
-    public const LOG_TYPE = 'MPesa';
+class MPesaConfig {
+    const LOG_TYPE = 'MPESA';
+    const PAYMENT_METHOD = 'M-Pesa';
+    const CHANNEL = 'STK Push';
+    const PENDING_STATUS = 1;
+    const PAID_STATUS = 2;
+    const FAILED_STATUS = 3;
     
-    private const REQUIRED_CONFIG = [
-        'mpesa_consumer_key',
-        'mpesa_consumer_secret',
-        'mpesa_shortcode',
-        'mpesa_passkey'
-    ];
-
     public static function getServer(): string {
-        global $_app_stage;
-        return $_app_stage == 'Live' 
-            ? 'https://api.safaricom.co.ke/'
-            : 'https://sandbox.safaricom.co.ke/';
+        global $config;
+        return isset($config['mpesa_sandbox']) && $config['mpesa_sandbox'] ? 
+            'https://sandbox.safaricom.co.ke/' : 
+            'https://api.safaricom.co.ke/';
     }
-
+    
     public static function validate(): void {
         global $config;
-        foreach (self::REQUIRED_CONFIG as $field) {
-            if (empty($config[$field])) {
-                throw new Exception("M-Pesa configuration missing: {$field}");
+        
+        $required = [
+            'mpesa_consumer_key' => 'Consumer Key',
+            'mpesa_consumer_secret' => 'Consumer Secret',
+            'mpesa_shortcode' => 'Business Shortcode',
+            'mpesa_passkey' => 'Passkey'
+        ];
+        
+        foreach ($required as $key => $name) {
+            if (empty($config[$key])) {
+                throw new Exception("M-Pesa $name is not configured");
             }
         }
     }
@@ -92,26 +92,38 @@ function mpesa_create_transaction($trx, $user): void {
     }
 }
 
+/**
+ * Validates and formats a phone number to the required format
+ * 
+ * @param string $phone The phone number to validate
+ * @return string The formatted phone number
+ * @throws Exception If the phone number is invalid
+ */
 function validate_phone_number(string $phone): string {
-    $phone = preg_replace('/[\s+-]/', '', $phone);
+    // Remove any non-digit characters
+    $phone = preg_replace('/\D/', '', $phone);
     
-    if (!preg_match('/^254\d{9}$/', $phone)) {
-        throw new Exception(Lang::T("Invalid phone number format. Must be 254XXXXXXXXX"));
+    // Check if it's a valid Kenyan phone number
+    if (preg_match('/^(?:254|0)?(7\d{8})$/', $phone, $matches)) {
+        return '254' . $matches[1];
     }
     
-    return $phone;
+    throw new Exception(Lang::T('Invalid phone number format. Please use a valid Kenyan phone number.'));
 }
 
-function create_stk_push_request($trx, string $phone): array {
+/**
+ * Creates the STK push request payload
+ * 
+ * @param ORM $trx The transaction object
+ * @param string $phone The formatted phone number
+ * @return array The STK push request payload
+ */
+function create_stk_push_request($trx, $phone): array {
     global $config;
     
     $timestamp = date('YmdHis');
-    $password = base64_encode(
-        $config['mpesa_shortcode'] . 
-        $config['mpesa_passkey'] . 
-        $timestamp
-    );
-
+    $password = base64_encode($config['mpesa_shortcode'] . $config['mpesa_passkey'] . $timestamp);
+    
     return [
         'BusinessShortCode' => $config['mpesa_shortcode'],
         'Password' => $password,
@@ -122,40 +134,54 @@ function create_stk_push_request($trx, string $phone): array {
         'PartyB' => $config['mpesa_shortcode'],
         'PhoneNumber' => $phone,
         'CallBackURL' => U . 'callback/mpesa',
-        'AccountReference' => $trx['id'],
-        'TransactionDesc' => 'Payment for Order #' . $trx['id']
+        'AccountReference' => 'PHPNuxBill-' . $trx['id'],
+        'TransactionDesc' => 'Internet Package: ' . $trx['plan_name']
     ];
 }
 
-function send_stk_push(array $request): array {
+/**
+ * Sends the STK push request to M-Pesa API
+ * 
+ * @param array $request The STK push request payload
+ * @return array The response from M-Pesa API
+ * @throws Exception If the request fails
+ */
+function send_stk_push($request): array {
     $token = mpesa_get_token();
-    $result = send_mpesa_request(
-        'mpesa/stkpush/v1/processrequest',
-        $request,
-        ['Authorization: Bearer ' . $token]
-    );
-
-    if (!isset($result['ResponseCode']) || $result['ResponseCode'] !== '0') {
-        throw new Exception(
-            Lang::T("Failed to initiate M-Pesa payment: ") . 
-            ($result['ResponseDescription'] ?? 'Unknown error')
-        );
+    
+    $headers = [
+        'Authorization: Bearer ' . $token,
+    ];
+    
+    $result = send_mpesa_request('mpesa/stkpush/v1/processrequest', $request, $headers);
+    
+    if (!isset($result['CheckoutRequestID'])) {
+        throw new Exception('Failed to initiate M-Pesa payment: ' . ($result['errorMessage'] ?? 'Unknown error'));
     }
-
+    
     return $result;
 }
 
-function save_transaction_details($trx, array $result): void {
+/**
+ * Saves the transaction details after STK push
+ * 
+ * @param ORM $trx The transaction object
+ * @param array $result The response from M-Pesa API
+ */
+function save_transaction_details($trx, $result): void {
     update_transaction($trx, [
         'gateway_trx_id' => $result['CheckoutRequestID'],
         'pg_request' => json_encode($result),
         'gateway' => 'mpesa',
         'payment_method' => MPesaConfig::PAYMENT_METHOD,
         'payment_channel' => MPesaConfig::CHANNEL,
-        'status' => MPesaConfig::FAILED_STATUS // Default to failed until success callback
+        'status' => MPesaConfig::PENDING_STATUS
     ]);
 }
 
+/**
+ * Handles the M-Pesa payment notification callback
+ */
 function mpesa_payment_notification(): void {
     try {
         $callback = process_callback_input();
@@ -167,9 +193,6 @@ function mpesa_payment_notification(): void {
         }
         
         $user = ORM::for_table('tbl_customers')->find_one($trx['user_id']);
-        if (!$user) {
-            throw new Exception('User not found');
-        }
         
         handle_payment_result($trx, $result, $user);
         
@@ -183,6 +206,12 @@ function mpesa_payment_notification(): void {
     }
 }
 
+/**
+ * Processes the callback input from M-Pesa
+ * 
+ * @return array The processed callback data
+ * @throws Exception If the callback format is invalid
+ */
 function process_callback_input(): ?array {
     $input = file_get_contents('php://input');
     mpesa_log('callback_received', ['details' => ['raw_input' => $input]]);
@@ -195,19 +224,33 @@ function process_callback_input(): ?array {
     return $callback;
 }
 
+/**
+ * Finds a transaction by the CheckoutRequestID
+ * 
+ * @param array $result The STK callback result
+ * @return ORM|null The transaction object or null if not found
+ */
 function find_transaction($result): ?ORM {
     return ORM::for_table('tbl_payment_gateway')
         ->where('gateway_trx_id', $result['CheckoutRequestID'])
         ->find_one();
 }
 
-function handle_payment_result($trx, $result, $user): void {
+/**
+ * Handles the payment result from M-Pesa
+ * 
+ * @param ORM $trx The transaction object
+ * @param array $result The STK callback result
+ * @param ORM|null $user The user object
+ * @throws Exception If there's an error processing the payment
+ */
+function handle_payment_result($trx, $result, $user = null): void {
     try {
         // First check if transaction is already processed
         if ($trx['status'] == MPesaConfig::PAID_STATUS) {
             mpesa_log('payment_already_processed', [
                 'trx_id' => $trx['id'],
-                'user' => $user['username']
+                'user' => $user ? $user['username'] : 'guest'
             ]);
             return;
         }
@@ -226,7 +269,7 @@ function handle_payment_result($trx, $result, $user): void {
 
             // Verify payment amount matches transaction amount
             if ($amount != $trx['price']) {
-                throw new Exception("Payment amount mismatch. Expected: {$trx['price']}, Received: {$amount}");
+                throw new Exception("Payment amount mismatch. Expected: {$trx['price']}, Received: " . (string)$amount);
             }
 
             // First update transaction status
@@ -239,8 +282,18 @@ function handle_payment_result($trx, $result, $user): void {
                 'gateway_trx_id' => $mpesa_receipt
             ]);
 
-            // Then proceed with package subscription
-            if (!Package::rechargeUser(
+            // If this is a hotspot login transaction, we don't need to activate a package
+            if ($trx['link_login']) {
+                mpesa_log('hotspot_payment_successful', [
+                    'trx_id' => $trx['id'],
+                    'amount' => $amount,
+                    'receipt' => $mpesa_receipt
+                ]);
+                return;
+            }
+
+            // For regular transactions, proceed with package subscription if user exists
+            if ($user && !Package::rechargeUser(
                 $user['id'], 
                 $trx['routers'], 
                 $trx['plan_id'], 
@@ -253,7 +306,7 @@ function handle_payment_result($trx, $result, $user): void {
             // Log successful payment
             mpesa_log('payment_successful', [
                 'trx_id' => $trx['id'],
-                'user' => $user['username'],
+                'user' => $user ? $user['username'] : 'guest',
                 'amount' => $amount,
                 'receipt' => $mpesa_receipt
             ]);
@@ -262,8 +315,8 @@ function handle_payment_result($trx, $result, $user): void {
                 "Payment Received from M-Pesa\n" .
                 "Amount: {$amount}\n" .
                 "Receipt: {$mpesa_receipt}\n" .
-                "Customer: {$user['fullname']}\n" .
-                "Transaction ID: {$trx['id']}"
+                "Customer: " . ($user ? $user['fullname'] : 'Hotspot Guest') . "\n" .
+                "Transaction ID: " . strval($trx['id'])
             );
         } else {
             // Handle failed payment
@@ -274,7 +327,7 @@ function handle_payment_result($trx, $result, $user): void {
 
             mpesa_log('payment_failed', [
                 'trx_id' => $trx['id'],
-                'user' => $user['username'],
+                'user' => $user ? $user['username'] : 'guest',
                 'result_code' => $result['ResultCode'],
                 'result_desc' => $result['ResultDesc']
             ]);
@@ -296,6 +349,12 @@ function handle_payment_result($trx, $result, $user): void {
     }
 }
 
+/**
+ * Updates a transaction with the given data
+ * 
+ * @param ORM $trx The transaction object
+ * @param array $data The data to update
+ */
 function update_transaction($trx, array $data): void {
     foreach ($data as $key => $value) {
         $trx->$key = $value;
@@ -303,6 +362,12 @@ function update_transaction($trx, array $data): void {
     $trx->save();
 }
 
+/**
+ * Gets an access token from M-Pesa API
+ * 
+ * @return string The access token
+ * @throws Exception If the token request fails
+ */
 function mpesa_get_token(): string {
     global $config;
     
@@ -338,6 +403,15 @@ function mpesa_get_token(): string {
     }
 }
 
+/**
+ * Sends a request to M-Pesa API
+ * 
+ * @param string $endpoint The API endpoint
+ * @param array $data The request data
+ * @param array $headers The request headers
+ * @return array The response from M-Pesa API
+ * @throws Exception If the request fails
+ */
 function send_mpesa_request(string $endpoint, array $data, array $headers): array {
     $response = Http::postJsonData(MPesaConfig::getServer() . $endpoint, $data, $headers);
     $result = json_decode($response, true);
@@ -349,94 +423,19 @@ function send_mpesa_request(string $endpoint, array $data, array $headers): arra
     return $result;
 }
 
+/**
+ * Logs M-Pesa related actions
+ * 
+ * @param string $action The action to log
+ * @param array $data The data to log
+ * @param bool $admin_notify Whether to notify the admin
+ */
 function mpesa_log($action, array $data, bool $admin_notify = false): void {
     Log::put($action, MPesaConfig::LOG_TYPE, 0, json_encode($data));
     if ($admin_notify) {
-        sendTelegram("M-Pesa $action\n\n" . json_encode($data, JSON_PRETTY_PRINT));
+        Message::sendTelegram("M-Pesa $action\n\n" . json_encode($data, JSON_PRETTY_PRINT));
     }
-}
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = $_POST['action'] ?? '';
     
-    switch ($action) {
-        case 'create_transaction':
-            $plan = ORM::for_table('tbl_plans')->find_one($_POST['plan_id']);
-            if (!$plan) {
-                // Redirect back to login page with error
-                header('Location: ' . U . 'login/mlogin?error=Plan+not+found');
-                exit;
-            }
-
-            // Create transaction record
-            $trx = ORM::for_table('tbl_payment_gateway')->create();
-            $trx->plan_id = $_POST['plan_id'];
-            $trx->plan_name = $plan['name_plan'];
-            $trx->price = $plan['price'];
-            $trx->phone_number = $_POST['phone_number'];
-            $trx->gateway = 'mpesa';
-            $trx->status = 1; // Pending
-            
-            // Store Mikrotik login parameters
-            $trx->link_login = $_POST['link_login'] ?? '';
-            $trx->link_orig = $_POST['link_orig'] ?? '';
-            $trx->mac = $_POST['mac'] ?? '';
-            $trx->ip = $_POST['ip'] ?? '';
-            
-            $trx->save();
-
-            // Create user array for mpesa function
-            $user = ['phonenumber' => $_POST['phone_number']];
-            
-            // Initiate M-Pesa payment
-            try {
-                MPesaConfig::validate();
-                $phone = validate_phone_number($user['phonenumber']);
-                $stk_request = create_stk_push_request($trx, $phone);
-                $result = send_stk_push($stk_request);
-                save_transaction_details($trx, $result);
-                
-                // Redirect to login page with order_id for polling
-                header('Location: ' . U . 'login/mlogin?order_id=' . $trx['id']);
-                exit;
-            } catch (Exception $e) {
-                mpesa_log('payment_initiation_failed', [
-                    'trx' => $trx,
-                    'details' => [
-                        'error' => $e->getMessage(),
-                        'user' => 'guest',
-                        'phone' => $user['phonenumber']
-                    ]
-                ]);
-                
-                // Redirect back to login page with error
-                header('Location: ' . U . 'login/mlogin?error=' . urlencode($e->getMessage()));
-                exit;
-            }
-            break;
-
-        case 'get_status':
-            $trx = ORM::for_table('tbl_payment_gateway')
-                ->find_one($_POST['order_id']);
-            if (!$trx) {
-                // Redirect back to login page with error
-                header('Location: ' . U . 'login/mlogin?error=Transaction+not+found');
-                exit;
-            }
-
-            $user = ['phonenumber' => $trx['phone_number']];
-            
-            // If payment is successful, redirect to Mikrotik login
-            if ($trx['status'] == MPesaConfig::PAID_STATUS) {
-                // Redirect to Mikrotik login with credentials
-                $redirect_url = $trx['link_login'] . '?username=' . $trx['plan_id'] . '&password=' . $trx['id'];
-                header('Location: ' . $redirect_url);
-                exit;
-            }
-            
-            // Otherwise, redirect back to login page for continued polling
-            header('Location: ' . U . 'login/mlogin?order_id=' . $trx['id']);
-            exit;
-            break;
-    }
 }
+
+

@@ -12,11 +12,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function validatePhoneNumber() {
         const phone = phoneInput.value.trim();
-        // Validate for Kenyan phone number format
+        // Validate for Kenyan phone number format - keep consistent with server-side validation
         return /^(?:254|\+254|0)?(7[0-9]{8})$/.test(phone);
     }
 
-    // Format phone number to 254XXXXXXXXX
+    // Format phone number to 254XXXXXXXXX - keep consistent with server-side formatting
     function formatPhoneNumber(phone) {
         phone = phone.replace(/[\s+-]/g, '');
         if (phone.startsWith('0')) {
@@ -53,7 +53,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Create hidden form for mpesa transaction
             const form = document.createElement('form');
             form.method = 'POST';
-            form.action = 'system/paymentgateway/mpesa.php';
+            form.action = BASE_URL + '/login/mlogin'; // Submit to the login controller
 
             // Get URL parameters
             const urlParams = new URLSearchParams(window.location.search);
@@ -99,7 +99,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Create hidden form for status check
             const form = document.createElement('form');
             form.method = 'POST';
-            form.action = 'system/paymentgateway/mpesa.php';
+            form.action = BASE_URL + '/login/mlogin'; // Submit to the login controller
 
             const fields = {
                 'action': 'get_status',

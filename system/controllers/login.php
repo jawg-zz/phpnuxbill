@@ -22,7 +22,89 @@ if (isset($routes['1'])) {
 
 switch ($do) {
     case 'mlogin':
-        // Always show mlogin.tpl for this route
+        // Check if this is a payment processing request
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+            $action = $_POST['action'];
+            
+            // Include M-Pesa functions
+            require_once 'system/paymentgateway/mpesa.php';
+            
+            switch ($action) {
+                case 'create_transaction':
+                    $plan = ORM::for_table('tbl_plans')->find_one($_POST['plan_id']);
+                    if (!$plan) {
+                        // Redirect back to login page with error
+                        r2(U . 'login/mlogin?error=' . urlencode('Plan not found'));
+                    }
+
+                    // Create transaction record
+                    $trx = ORM::for_table('tbl_payment_gateway')->create();
+                    $trx->plan_id = $_POST['plan_id'];
+                    $trx->plan_name = $plan['name_plan'];
+                    $trx->price = $plan['price'];
+                    $trx->phone_number = $_POST['phone_number'];
+                    $trx->gateway = 'mpesa';
+                    $trx->status = MPesaConfig::PENDING_STATUS; // Use constant for consistency
+                    
+                    // Store Mikrotik login parameters
+                    $trx->link_login = $_POST['link_login'] ?? '';
+                    $trx->link_orig = $_POST['link_orig'] ?? '';
+                    $trx->mac = $_POST['mac'] ?? '';
+                    $trx->ip = $_POST['ip'] ?? '';
+                    
+                    $trx->save();
+
+                    // Create user array for mpesa function
+                    $user = ['phonenumber' => $_POST['phone_number']];
+                    
+                    // Initiate M-Pesa payment
+                    try {
+                        MPesaConfig::validate();
+                        $phone = validate_phone_number($user['phonenumber']);
+                        $stk_request = create_stk_push_request($trx, $phone);
+                        $result = send_stk_push($stk_request);
+                        save_transaction_details($trx, $result);
+                        
+                        // Redirect to login page with order_id for polling
+                        r2(U . 'login/mlogin?order_id=' . $trx['id']);
+                    } catch (Exception $e) {
+                        mpesa_log('payment_initiation_failed', [
+                            'trx' => $trx,
+                            'details' => [
+                                'error' => $e->getMessage(),
+                                'user' => 'guest',
+                                'phone' => $user['phonenumber']
+                            ]
+                        ], true);
+                        
+                        // Redirect back to login page with error
+                        r2(U . 'login/mlogin?error=' . urlencode($e->getMessage()));
+                    }
+                    break;
+
+                case 'get_status':
+                    $trx = ORM::for_table('tbl_payment_gateway')
+                        ->find_one($_POST['order_id']);
+                    if (!$trx) {
+                        // Redirect back to login page with error
+                        r2(U . 'login/mlogin?error=' . urlencode('Transaction not found'));
+                    }
+                    
+                    // If payment is successful, redirect to Mikrotik login
+                    if ($trx['status'] == MPesaConfig::PAID_STATUS) {
+                        // Redirect to Mikrotik login with credentials
+                        $redirect_url = $trx['link_login'] . '?username=' . $trx['plan_id'] . '&password=' . $trx['id'];
+                        header('Location: ' . $redirect_url);
+                        exit;
+                    }
+                    
+                    // Otherwise, redirect back to login page for continued polling
+                    r2(U . 'login/mlogin?order_id=' . $trx['id']);
+                    break;
+            }
+        }
+        
+        // Display the login page
         run_hook('customer_view_mlogin'); #HOOK
         $csrf_token = Csrf::generateAndStoreToken();
         $ui->assign('csrf_token', $csrf_token);
