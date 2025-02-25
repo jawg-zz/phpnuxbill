@@ -363,7 +363,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         case 'create_transaction':
             $plan = ORM::for_table('tbl_plans')->find_one($_POST['plan_id']);
             if (!$plan) {
-                r2(U . 'order/package', 'e', Lang::T("Plan not found"));
+                // Redirect back to login page with error
+                header('Location: ' . U . 'login/mlogin?error=Plan+not+found');
+                exit;
             }
 
             // Create transaction record
@@ -374,24 +376,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $trx->phone_number = $_POST['phone_number'];
             $trx->gateway = 'mpesa';
             $trx->status = 1; // Pending
+            
+            // Store Mikrotik login parameters
+            $trx->link_login = $_POST['link_login'] ?? '';
+            $trx->link_orig = $_POST['link_orig'] ?? '';
+            $trx->mac = $_POST['mac'] ?? '';
+            $trx->ip = $_POST['ip'] ?? '';
+            
             $trx->save();
 
             // Create user array for mpesa function
             $user = ['phonenumber' => $_POST['phone_number']];
             
             // Initiate M-Pesa payment
-            mpesa_create_transaction($trx, $user);
+            try {
+                MPesaConfig::validate();
+                $phone = validate_phone_number($user['phonenumber']);
+                $stk_request = create_stk_push_request($trx, $phone);
+                $result = send_stk_push($stk_request);
+                save_transaction_details($trx, $result);
+                
+                // Redirect to login page with order_id for polling
+                header('Location: ' . U . 'login/mlogin?order_id=' . $trx['id']);
+                exit;
+            } catch (Exception $e) {
+                mpesa_log('payment_initiation_failed', [
+                    'trx' => $trx,
+                    'details' => [
+                        'error' => $e->getMessage(),
+                        'user' => 'guest',
+                        'phone' => $user['phonenumber']
+                    ]
+                ]);
+                
+                // Redirect back to login page with error
+                header('Location: ' . U . 'login/mlogin?error=' . urlencode($e->getMessage()));
+                exit;
+            }
             break;
 
         case 'get_status':
             $trx = ORM::for_table('tbl_payment_gateway')
                 ->find_one($_POST['order_id']);
             if (!$trx) {
-                r2(U . 'order/package', 'e', Lang::T("Transaction not found"));
+                // Redirect back to login page with error
+                header('Location: ' . U . 'login/mlogin?error=Transaction+not+found');
+                exit;
             }
 
             $user = ['phonenumber' => $trx['phone_number']];
-            mpesa_get_status($trx, $user);
+            
+            // If payment is successful, redirect to Mikrotik login
+            if ($trx['status'] == MPesaConfig::PAID_STATUS) {
+                // Redirect to Mikrotik login with credentials
+                $redirect_url = $trx['link_login'] . '?username=' . $trx['plan_id'] . '&password=' . $trx['id'];
+                header('Location: ' . $redirect_url);
+                exit;
+            }
+            
+            // Otherwise, redirect back to login page for continued polling
+            header('Location: ' . U . 'login/mlogin?order_id=' . $trx['id']);
+            exit;
             break;
     }
 }

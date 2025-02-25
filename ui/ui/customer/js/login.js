@@ -55,15 +55,18 @@ document.addEventListener('DOMContentLoaded', function() {
             form.method = 'POST';
             form.action = 'system/paymentgateway/mpesa.php';
 
+            // Get URL parameters
+            const urlParams = new URLSearchParams(window.location.search);
+
             // Add necessary fields
             const fields = {
                 'action': 'create_transaction',
                 'plan_id': planId,
                 'phone_number': formattedPhone,
-                'link_login': document.getElementsByName('link-login')[0]?.value || '',
-                'link_orig': document.getElementsByName('link-orig')[0]?.value || '',
-                'mac': document.getElementsByName('mac')[0]?.value || '',
-                'ip': document.getElementsByName('ip')[0]?.value || ''
+                'link_login': urlParams.get('link-login') || '',
+                'link_orig': urlParams.get('link-orig') || '',
+                'mac': urlParams.get('nux-mac') || '',
+                'ip': urlParams.get('nux-ip') || ''
             };
 
             for (const [key, value] of Object.entries(fields)) {
@@ -131,16 +134,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Notification system
     function showNotification(message, type = 'info') {
-        const loginError = document.getElementById('loginError');
-        if (!loginError) return;
-
-        loginError.textContent = message;
-        loginError.classList.remove('hidden');
-
-        // Style based on type
-        loginError.className = 'mb-4 p-3 rounded-lg text-sm ' + 
-            (type === 'error' ? 'bg-red-100 text-red-700' :
-             type === 'success' ? 'bg-green-100 text-green-700' :
-             'bg-blue-100 text-blue-700');
+        const notification = document.createElement('div');
+        notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ${
+            type === 'error' ? 'bg-red-500 text-white' : 'bg-green-500 text-white'
+        }`;
+        notification.textContent = message;
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.classList.add('opacity-0', 'transition-opacity', 'duration-500');
+            setTimeout(() => notification.remove(), 500);
+        }, 3000);
     }
 });

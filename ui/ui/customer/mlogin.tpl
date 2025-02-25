@@ -144,7 +144,13 @@
         </div>
     </div>
 
-    <div class="loading-overlay"></div>
+    <div class="loading-overlay hidden">
+        <div>
+            <div class="loading-spinner mx-auto"></div>
+            <p>Processing M-Pesa payment...</p>
+            <p class="text-sm mt-2">Please check your phone for the STK push notification</p>
+        </div>
+    </div>
 
     <!-- Core libraries -->
     <script src="https://cdn.tailwindcss.com"></script>
