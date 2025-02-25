@@ -53,7 +53,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Create hidden form for mpesa transaction
             const form = document.createElement('form');
             form.method = 'POST';
-            form.action = BASE_URL + '/login/mlogin'; // Submit to the login controller
+            form.action = BASE_URL + '/?_route=login/mlogin'; // Submit to the login controller
 
             // Get URL parameters
             const urlParams = new URLSearchParams(window.location.search);
@@ -99,7 +99,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Create hidden form for status check
             const form = document.createElement('form');
             form.method = 'POST';
-            form.action = BASE_URL + '/login/mlogin'; // Submit to the login controller
+            form.action = BASE_URL + '/?_route=login/mlogin'; // Submit to the login controller
 
             const fields = {
                 'action': 'get_status',
