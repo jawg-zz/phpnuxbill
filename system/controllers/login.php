@@ -34,65 +34,90 @@ switch ($do) {
                     // Debug - log the request
                     _log('M-Pesa Transaction Request: ' . json_encode($_POST), 'mpesa_debug');
                     
-                    $plan = ORM::for_table('tbl_plans')->find_one($_POST['plan_id']);
-                    if (!$plan) {
-                        // Redirect back to login page with error
-                        r2(U . 'login/mlogin?error=' . urlencode('Plan not found'));
-                    }
-
-                    // Create transaction record
-                    $trx = ORM::for_table('tbl_payment_gateway')->create();
-                    $trx->plan_id = $_POST['plan_id'];
-                    $trx->plan_name = $plan['name_plan'];
-                    $trx->price = $plan['price'];
-                    $trx->phone_number = $_POST['phone_number'];
-                    $trx->gateway = 'mpesa';
-                    $trx->status = MPesaConfig::PENDING_STATUS; // Use constant for consistency
-                    
-                    // Store hotspot data in pg_request field
-                    $hotspot_data = [
-                        'hotspot_login' => isset($_POST['hotspot_login']),
-                        'link_login' => $_POST['link_login'] ?? '',
-                        'link_orig' => $_POST['link_orig'] ?? '',
-                        'mac' => $_POST['mac'] ?? '',
-                        'ip' => $_POST['ip'] ?? ''
-                    ];
-                    $trx->pg_request = json_encode(['hotspot_data' => $hotspot_data]);
-                    
-                    $trx->save();
-                    
-                    // Initiate M-Pesa payment
                     try {
-                        // Validate M-Pesa configuration
-                        MPesaConfig::validate();
-                        
-                        // Format phone number
-                        $phone = $_POST['phone_number'];
-                        
-                        // Create and send STK push
-                        $stk_request = create_stk_push_request($trx, $phone);
-                        $result = send_stk_push($stk_request);
-                        
-                        // Update transaction with M-Pesa response
-                        if (isset($result['CheckoutRequestID'])) {
-                            // Get existing pg_request data
-                            $pg_data = json_decode($trx->pg_request, true) ?: [];
-                            // Add M-Pesa result
-                            $pg_data['mpesa_result'] = $result;
-                            // Update the record
-                            $trx->gateway_trx_id = $result['CheckoutRequestID'];
-                            $trx->pg_request = json_encode($pg_data);
-                            $trx->save();
+                        // Check if plan exists
+                        $plan = ORM::for_table('tbl_plans')->find_one($_POST['plan_id']);
+                        if (!$plan) {
+                            _log('M-Pesa Error: Plan not found - ' . $_POST['plan_id'], 'mpesa_error');
+                            r2(U . 'login/mlogin?error=' . urlencode('Plan not found'));
                         }
+
+                        // Log plan details
+                        _log('M-Pesa Plan Found: ' . json_encode($plan->as_array()), 'mpesa_debug');
+
+                        // Create transaction record
+                        $trx = ORM::for_table('tbl_payment_gateway')->create();
+                        $trx->plan_id = $_POST['plan_id'];
+                        $trx->plan_name = $plan['name_plan'];
+                        $trx->price = $plan['price'];
+                        $trx->phone_number = $_POST['phone_number'];
+                        $trx->gateway = 'mpesa';
+                        $trx->status = MPesaConfig::PENDING_STATUS; // Use constant for consistency
                         
-                        // Redirect to login page with order_id for polling
-                        r2(U . 'login/mlogin?order_id=' . $trx['id']);
+                        // Store hotspot data in pg_request field
+                        $hotspot_data = [
+                            'hotspot_login' => isset($_POST['hotspot_login']),
+                            'link_login' => $_POST['link_login'] ?? '',
+                            'link_orig' => $_POST['link_orig'] ?? '',
+                            'mac' => $_POST['mac'] ?? '',
+                            'ip' => $_POST['ip'] ?? ''
+                        ];
+                        $trx->pg_request = json_encode(['hotspot_data' => $hotspot_data]);
+                        
+                        // Log transaction before save
+                        _log('M-Pesa Transaction Before Save: ' . json_encode($trx->as_array()), 'mpesa_debug');
+                        
+                        $trx->save();
+                        
+                        // Log transaction after save
+                        _log('M-Pesa Transaction After Save: ' . json_encode($trx->as_array()), 'mpesa_debug');
+                        
+                        // Initiate M-Pesa payment
+                        try {
+                            // Validate M-Pesa configuration
+                            _log('M-Pesa Validating Configuration', 'mpesa_debug');
+                            MPesaConfig::validate();
+                            
+                            // Format phone number
+                            $phone = $_POST['phone_number'];
+                            _log('M-Pesa Phone Number: ' . $phone, 'mpesa_debug');
+                            
+                            // Create and send STK push
+                            $stk_request = create_stk_push_request($trx, $phone);
+                            _log('M-Pesa STK Request: ' . json_encode($stk_request), 'mpesa_debug');
+                            
+                            $result = send_stk_push($stk_request);
+                            _log('M-Pesa STK Response: ' . json_encode($result), 'mpesa_debug');
+                            
+                            // Update transaction with M-Pesa response
+                            if (isset($result['CheckoutRequestID'])) {
+                                // Get existing pg_request data
+                                $pg_data = json_decode($trx->pg_request, true) ?: [];
+                                // Add M-Pesa result
+                                $pg_data['mpesa_result'] = $result;
+                                // Update the record
+                                $trx->gateway_trx_id = $result['CheckoutRequestID'];
+                                $trx->pg_request = json_encode($pg_data);
+                                $trx->save();
+                                
+                                _log('M-Pesa Transaction Updated: ' . json_encode($trx->as_array()), 'mpesa_debug');
+                            }
+                            
+                            // Redirect to login page with order_id for polling
+                            r2(U . 'login/mlogin?order_id=' . $trx['id']);
+                        } catch (Exception $e) {
+                            // Log error
+                            _log('M-Pesa Error: ' . $e->getMessage() . ' - ' . $e->getTraceAsString(), 'mpesa_error');
+                            
+                            // Redirect back to login page with error
+                            r2(U . 'login/mlogin?error=' . urlencode($e->getMessage()));
+                        }
                     } catch (Exception $e) {
                         // Log error
-                        _log('M-Pesa Error: ' . $e->getMessage(), 'mpesa_error');
+                        _log('M-Pesa Transaction Creation Error: ' . $e->getMessage() . ' - ' . $e->getTraceAsString(), 'mpesa_error');
                         
                         // Redirect back to login page with error
-                        r2(U . 'login/mlogin?error=' . urlencode($e->getMessage()));
+                        r2(U . 'login/mlogin?error=' . urlencode('Error creating transaction: ' . $e->getMessage()));
                     }
                     break;
                     

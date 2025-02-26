@@ -20,13 +20,29 @@ class MPesaConfig {
             'https://api.safaricom.co.ke/';
     }
     
+    public static function getConfig(): array {
+        global $config;
+        
+        $mpesa_config = [
+            'consumer_key' => $config['mpesa_consumer_key'] ?? 'NOT SET',
+            'consumer_secret' => $config['mpesa_consumer_secret'] ? 'SET (hidden)' : 'NOT SET',
+            'shortcode' => $config['mpesa_shortcode'] ?? 'NOT SET',
+            'passkey' => $config['mpesa_passkey'] ? 'SET (hidden)' : 'NOT SET'
+        ];
+        
+        return $mpesa_config;
+    }
+    
     public static function validate(): void {
         global $config;
+        
+        // Log current configuration (masked)
+        mpesa_log('config_check', self::getConfig());
         
         $required = [
             'mpesa_consumer_key' => 'Consumer Key',
             'mpesa_consumer_secret' => 'Consumer Secret',
-            'mpesa_shortcode' => 'Business Shortcode',
+            'mpesa_shortcode' => 'Shortcode',
             'mpesa_passkey' => 'Passkey'
         ];
         
