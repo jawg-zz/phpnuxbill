@@ -169,9 +169,15 @@ function send_stk_push($request): array {
  * @param array $result The response from M-Pesa API
  */
 function save_transaction_details($trx, $result): void {
+    // Get existing pg_request data to preserve hotspot_data if it exists
+    $pg_data = json_decode($trx['pg_request'], true) ?: [];
+    
+    // Add M-Pesa result to pg_data
+    $pg_data['mpesa_result'] = $result;
+    
     update_transaction($trx, [
         'gateway_trx_id' => $result['CheckoutRequestID'],
-        'pg_request' => json_encode($result),
+        'pg_request' => json_encode($pg_data),
         'gateway' => 'mpesa',
         'payment_method' => MPesaConfig::PAYMENT_METHOD,
         'payment_channel' => MPesaConfig::CHANNEL,
@@ -263,27 +269,26 @@ function handle_payment_result($trx, $result, $user = null): void {
             
             // Extract Amount and Receipt Number
             foreach ($payment_details as $item) {
-                if ($item['Name'] === 'Amount') $amount = $item['Value'];
-                if ($item['Name'] === 'MpesaReceiptNumber') $mpesa_receipt = $item['Value'];
+                if ($item['Name'] === 'Amount') {
+                    $amount = $item['Value'];
+                } else if ($item['Name'] === 'MpesaReceiptNumber') {
+                    $mpesa_receipt = $item['Value'];
+                }
             }
-
-            // Verify payment amount matches transaction amount
-            if ($amount != $trx['price']) {
-                throw new Exception("Payment amount mismatch. Expected: {$trx['price']}, Received: " . (string)$amount);
-            }
-
-            // First update transaction status
+            
+            // Update transaction status
             update_transaction($trx, [
-                'status' => MPesaConfig::PAID_STATUS,
-                'pg_paid_response' => json_encode($result),
-                'paid_date' => date('Y-m-d H:i:s'),
-                'payment_method' => MPesaConfig::PAYMENT_METHOD,
-                'payment_channel' => MPesaConfig::CHANNEL,
-                'gateway_trx_id' => $mpesa_receipt
+                'payment_ref' => $mpesa_receipt,
+                'pg_response' => json_encode($result),
+                'status' => MPesaConfig::PAID_STATUS
             ]);
-
-            // If this is a hotspot login transaction, we don't need to activate a package
-            if ($trx['link_login']) {
+            
+            // Check if this is a hotspot login transaction
+            $pg_data = json_decode($trx['pg_request'], true) ?: [];
+            $hotspot_data = $pg_data['hotspot_data'] ?? [];
+            
+            if (!empty($hotspot_data['hotspot_login'])) {
+                // For hotspot login, we don't need to activate a package
                 mpesa_log('hotspot_payment_successful', [
                     'trx_id' => $trx['id'],
                     'amount' => $amount,
@@ -310,21 +315,13 @@ function handle_payment_result($trx, $result, $user = null): void {
                 'amount' => $amount,
                 'receipt' => $mpesa_receipt
             ]);
-
-            Message::sendTelegram(
-                "Payment Received from M-Pesa\n" .
-                "Amount: {$amount}\n" .
-                "Receipt: {$mpesa_receipt}\n" .
-                "Customer: " . ($user ? $user['fullname'] : 'Hotspot Guest') . "\n" .
-                "Transaction ID: " . strval($trx['id'])
-            );
         } else {
-            // Handle failed payment
+            // Payment failed
             update_transaction($trx, [
-                'status' => MPesaConfig::FAILED_STATUS,
-                'pg_paid_response' => json_encode($result)
+                'pg_response' => json_encode($result),
+                'status' => MPesaConfig::FAILED_STATUS
             ]);
-
+            
             mpesa_log('payment_failed', [
                 'trx_id' => $trx['id'],
                 'user' => $user ? $user['username'] : 'guest',
@@ -334,18 +331,10 @@ function handle_payment_result($trx, $result, $user = null): void {
         }
     } catch (Exception $e) {
         mpesa_log('payment_processing_error', [
-            'trx' => $trx,
-            'details' => ['error' => $e->getMessage()]
+            'trx_id' => $trx['id'],
+            'error' => $e->getMessage()
         ], true);
-        
-        // Ensure transaction is marked as failed in case of errors
-        update_transaction($trx, [
-            'status' => MPesaConfig::FAILED_STATUS,
-            'pg_paid_response' => json_encode([
-                'error' => $e->getMessage(),
-                'original_result' => $result
-            ])
-        ]);
+        throw $e;
     }
 }
 

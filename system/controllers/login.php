@@ -49,12 +49,15 @@ switch ($do) {
                     $trx->gateway = 'mpesa';
                     $trx->status = MPesaConfig::PENDING_STATUS; // Use constant for consistency
                     
-                    // Store Mikrotik login parameters
-                    $trx->link_login = $_POST['link_login'] ?? '';
-                    $trx->link_orig = $_POST['link_orig'] ?? '';
-                    $trx->mac = $_POST['mac'] ?? '';
-                    $trx->ip = $_POST['ip'] ?? '';
-                    $trx->hotspot_login = true; // Mark as hotspot login transaction
+                    // Store hotspot data in pg_request field
+                    $hotspot_data = [
+                        'hotspot_login' => isset($_POST['hotspot_login']),
+                        'link_login' => $_POST['link_login'] ?? '',
+                        'link_orig' => $_POST['link_orig'] ?? '',
+                        'mac' => $_POST['mac'] ?? '',
+                        'ip' => $_POST['ip'] ?? ''
+                    ];
+                    $trx->pg_request = json_encode(['hotspot_data' => $hotspot_data]);
                     
                     $trx->save();
                     
@@ -70,9 +73,15 @@ switch ($do) {
                         $stk_request = create_stk_push_request($trx, $phone);
                         $result = send_stk_push($stk_request);
                         
-                        // Save transaction details
+                        // Update transaction with M-Pesa response
                         if (isset($result['CheckoutRequestID'])) {
-                            $trx->checkout_request_id = $result['CheckoutRequestID'];
+                            // Get existing pg_request data
+                            $pg_data = json_decode($trx->pg_request, true) ?: [];
+                            // Add M-Pesa result
+                            $pg_data['mpesa_result'] = $result;
+                            // Update the record
+                            $trx->gateway_trx_id = $result['CheckoutRequestID'];
+                            $trx->pg_request = json_encode($pg_data);
                             $trx->save();
                         }
                         
@@ -96,10 +105,17 @@ switch ($do) {
                     
                     // If payment is successful, redirect to Mikrotik login
                     if ($trx['status'] == MPesaConfig::PAID_STATUS) {
-                        // Redirect to Mikrotik login with credentials
-                        $redirect_url = $trx['link_login'] . '?username=' . $trx['plan_id'] . '&password=' . $trx['id'];
-                        header('Location: ' . $redirect_url);
-                        exit;
+                        // Get hotspot data from pg_request
+                        $pg_data = json_decode($trx['pg_request'], true) ?: [];
+                        $hotspot_data = $pg_data['hotspot_data'] ?? [];
+                        
+                        // Check if this is a hotspot login transaction
+                        if (!empty($hotspot_data['hotspot_login']) && !empty($hotspot_data['link_login'])) {
+                            // Redirect to Mikrotik login with credentials
+                            $redirect_url = $hotspot_data['link_login'] . '?username=' . $trx['plan_id'] . '&password=' . $trx['id'];
+                            header('Location: ' . $redirect_url);
+                            exit;
+                        }
                     }
                     
                     // Otherwise, redirect back to login page for continued polling
