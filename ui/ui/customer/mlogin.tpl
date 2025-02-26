@@ -62,71 +62,18 @@
 
                 <!-- Pricing Plans -->
                 <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6" id="pricingPlans" style="pointer-events: none; opacity: 0.5;">
+                    {foreach $plans as $plan}
                     <div class="package-option p-3 border-2 border-indigo-200 rounded-lg bg-indigo-50 hover:border-indigo-300 transition-colors duration-200 h-full cursor-pointer hover:shadow-md"
-                         data-plan="1h">
+                         data-plan="{$plan['id']}">
                         <div class="space-y-2">
                             <div class="text-center">
-                                <span class="text-2xl font-black text-indigo-900">Ksh 20</span>
+                                <span class="text-2xl font-black text-indigo-900">Ksh {$plan['price']}</span>
                             </div>
-                            <h3 class="text-lg font-bold text-indigo-900 text-center">1 Hour</h3>
-                            <p class="text-sm font-medium text-indigo-700 text-center">Unlimited High speed</p>
+                            <h3 class="text-lg font-bold text-indigo-900 text-center">{$plan['name_plan']}</h3>
+                            <p class="text-sm font-medium text-indigo-700 text-center">{$plan['descr']}</p>
                         </div>
                     </div>
-
-                    <div class="package-option p-3 border-2 border-purple-200 rounded-lg bg-purple-50 hover:border-purple-300 transition-colors duration-200 h-full cursor-pointer hover:shadow-md"
-                         data-plan="3h">
-                        <div class="space-y-2">
-                            <div class="text-center">
-                                <span class="text-2xl font-black text-purple-900">Ksh 30</span>
-                            </div>
-                            <h3 class="text-lg font-bold text-purple-900 text-center">3 Hours</h3>
-                            <p class="text-sm font-medium text-purple-700 text-center">Unlimited High speed</p>
-                        </div>
-                    </div>
-
-                    <div class="package-option p-3 border-2 border-pink-200 rounded-lg bg-pink-50 hover:border-pink-300 transition-colors duration-200 h-full cursor-pointer hover:shadow-md"
-                         data-plan="6h">
-                        <div class="space-y-2">
-                            <div class="text-center">
-                                <span class="text-2xl font-black text-pink-900">Ksh 50</span>
-                            </div>
-                            <h3 class="text-lg font-bold text-pink-900 text-center">6 Hours</h3>
-                            <p class="text-sm font-medium text-pink-700 text-center">Unlimited High speed</p>
-                        </div>
-                    </div>
-
-                    <div class="package-option p-3 border-2 border-blue-200 rounded-lg bg-blue-50 hover:border-blue-300 transition-colors duration-200 h-full cursor-pointer hover:shadow-md"
-                         data-plan="daily">
-                        <div class="space-y-2">
-                            <div class="text-center">
-                                <span class="text-2xl font-black text-blue-900">Ksh 99</span>
-                            </div>
-                            <h3 class="text-lg font-bold text-blue-900 text-center">Daily</h3>
-                            <p class="text-sm font-medium text-blue-700 text-center">Unlimited High speed</p>
-                        </div>
-                    </div>
-
-                    <div class="package-option p-3 border-2 border-green-200 rounded-lg bg-green-50 hover:border-green-300 transition-colors duration-200 h-full cursor-pointer hover:shadow-md"
-                         data-plan="weekly">
-                        <div class="space-y-2">
-                            <div class="text-center">
-                                <span class="text-2xl font-black text-green-900">Ksh 599</span>
-                            </div>
-                            <h3 class="text-lg font-bold text-green-900 text-center">Weekly</h3>
-                            <p class="text-sm font-medium text-green-700 text-center">Unlimited High speed</p>
-                        </div>
-                    </div>
-
-                    <div class="package-option p-3 border-2 border-purple-200 rounded-lg bg-purple-50 hover:border-purple-300 transition-colors duration-200 h-full cursor-pointer hover:shadow-md"
-                         data-plan="monthly">
-                        <div class="space-y-2">
-                            <div class="text-center">
-                                <span class="text-2xl font-black text-purple-900">Ksh 1,999</span>
-                            </div>
-                            <h3 class="text-lg font-bold text-purple-900 text-center">Monthly</h3>
-                            <p class="text-sm font-medium text-purple-700 text-center">Unlimited High speed</p>
-                        </div>
-                    </div>
+                    {/foreach}
                 </div>
 
                 <!-- Device Info -->

@@ -31,6 +31,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.package-option').forEach(option => {
         option.addEventListener('click', function(e) {
             e.preventDefault();
+            e.stopPropagation(); // Prevent event bubbling
             
             const phoneNumber = phoneInput.value.trim();
             if (!validatePhoneNumber()) {
@@ -54,6 +55,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const form = document.createElement('form');
             form.method = 'POST';
             form.action = BASE_URL + '/?_route=login/mlogin'; // Submit to the login controller
+            
+            // Ensure we're not following any other links
+            form.onsubmit = function() {
+                return true; // Allow only this form submission
+            };
 
             // Get URL parameters
             const urlParams = new URLSearchParams(window.location.search);
@@ -66,7 +72,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 'link_login': urlParams.get('link-login') || '',
                 'link_orig': urlParams.get('link-orig') || '',
                 'mac': urlParams.get('nux-mac') || '',
-                'ip': urlParams.get('nux-ip') || ''
+                'ip': urlParams.get('nux-ip') || '',
+                'hotspot_login': 'true' // Add explicit flag for hotspot login
             };
 
             for (const [key, value] of Object.entries(fields)) {
@@ -80,6 +87,9 @@ document.addEventListener('DOMContentLoaded', function() {
             // Add form to document and submit
             document.body.appendChild(form);
             form.submit();
+            
+            // Prevent default anchor behavior if this is inside an <a> tag
+            return false;
         });
     });
 

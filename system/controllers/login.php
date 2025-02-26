@@ -31,6 +31,9 @@ switch ($do) {
             
             switch ($action) {
                 case 'create_transaction':
+                    // Debug - log the request
+                    _log('M-Pesa Transaction Request: ' . json_encode($_POST), 'mpesa_debug');
+                    
                     $plan = ORM::for_table('tbl_plans')->find_one($_POST['plan_id']);
                     if (!$plan) {
                         // Redirect back to login page with error
@@ -51,42 +54,43 @@ switch ($do) {
                     $trx->link_orig = $_POST['link_orig'] ?? '';
                     $trx->mac = $_POST['mac'] ?? '';
                     $trx->ip = $_POST['ip'] ?? '';
+                    $trx->hotspot_login = true; // Mark as hotspot login transaction
                     
                     $trx->save();
-
-                    // Create user array for mpesa function
-                    $user = ['phonenumber' => $_POST['phone_number']];
                     
                     // Initiate M-Pesa payment
                     try {
+                        // Validate M-Pesa configuration
                         MPesaConfig::validate();
-                        $phone = validate_phone_number($user['phonenumber']);
+                        
+                        // Format phone number
+                        $phone = $_POST['phone_number'];
+                        
+                        // Create and send STK push
                         $stk_request = create_stk_push_request($trx, $phone);
                         $result = send_stk_push($stk_request);
-                        save_transaction_details($trx, $result);
+                        
+                        // Save transaction details
+                        if (isset($result['CheckoutRequestID'])) {
+                            $trx->checkout_request_id = $result['CheckoutRequestID'];
+                            $trx->save();
+                        }
                         
                         // Redirect to login page with order_id for polling
                         r2(U . 'login/mlogin?order_id=' . $trx['id']);
                     } catch (Exception $e) {
-                        mpesa_log('payment_initiation_failed', [
-                            'trx' => $trx,
-                            'details' => [
-                                'error' => $e->getMessage(),
-                                'user' => 'guest',
-                                'phone' => $user['phonenumber']
-                            ]
-                        ], true);
+                        // Log error
+                        _log('M-Pesa Error: ' . $e->getMessage(), 'mpesa_error');
                         
                         // Redirect back to login page with error
                         r2(U . 'login/mlogin?error=' . urlencode($e->getMessage()));
                     }
                     break;
-
+                    
                 case 'get_status':
                     $trx = ORM::for_table('tbl_payment_gateway')
                         ->find_one($_POST['order_id']);
                     if (!$trx) {
-                        // Redirect back to login page with error
                         r2(U . 'login/mlogin?error=' . urlencode('Transaction not found'));
                     }
                     
@@ -109,6 +113,14 @@ switch ($do) {
         $csrf_token = Csrf::generateAndStoreToken();
         $ui->assign('csrf_token', $csrf_token);
         $ui->assign('_title', Lang::T('Login'));
+        
+        // Get plans for display
+        $plans = ORM::for_table('tbl_plans')
+            ->where('enabled', '1')
+            ->where('type', 'Hotspot')
+            ->find_many();
+        $ui->assign('plans', $plans);
+        
         $ui->display('customer/mlogin.tpl');
         break;
 
@@ -216,7 +228,7 @@ switch ($do) {
                     if (!empty($config['voucher_redirect'])) {
                         _alert(Lang::T("Voucher activation success, now you can login"), 'danger', $config['voucher_redirect']);
                     } else {
-                        r2(getUrl('login'), 's', Lang::T("Voucher activation success, you are connected to internet"));
+                        r2(getUrl('login'), 's', Lang::T("Voucher activation success, now you can login"));
                     }
                 } else {
                     _alert(Lang::T('Internet Plan Expired'), 'danger', "login");
