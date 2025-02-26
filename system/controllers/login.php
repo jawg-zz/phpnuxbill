@@ -52,7 +52,13 @@ switch ($do) {
                         $trx->price = $plan['price'];
                         $trx->gateway = 'mpesa';
                         $trx->status = MPesaConfig::PENDING_STATUS; // Use constant for consistency
-                        
+                        // Add username field - use a temporary value for hotspot login
+                        $trx->username = 'hotspot_' . time(); // Generate a temporary username
+                        // Add required created_date field
+                        $trx->created_date = date('Y-m-d H:i:s');
+                        // Add expired_date field (optional but good to have)
+                        $trx->expired_date = date('Y-m-d H:i:s', strtotime('+1 day'));
+
                         // Store hotspot data in pg_request field
                         $hotspot_data = [
                             'hotspot_login' => isset($_POST['hotspot_login']),
@@ -63,10 +69,10 @@ switch ($do) {
                             'phone_number' => $_POST['phone_number'] // Store it here if needed for reference
                         ];
                         $trx->pg_request = json_encode(['hotspot_data' => $hotspot_data]);
-                        
+
                         // Log transaction before save
                         _log('M-Pesa Transaction Before Save: ' . json_encode($trx->as_array()), 'mpesa_debug');
-                        
+
                         $trx->save();
                         
                         // Log transaction after save
@@ -136,8 +142,13 @@ switch ($do) {
                         
                         // Check if this is a hotspot login transaction
                         if (!empty($hotspot_data['hotspot_login']) && !empty($hotspot_data['link_login'])) {
+                            // Use the plan_id as username and transaction id as password
+                            // This ensures the user gets the correct plan
+                            $username = $trx['plan_id'];
+                            $password = $trx['id'];
+                            
                             // Redirect to Mikrotik login with credentials
-                            $redirect_url = $hotspot_data['link_login'] . '?username=' . $trx['plan_id'] . '&password=' . $trx['id'];
+                            $redirect_url = $hotspot_data['link_login'] . '?username=' . $username . '&password=' . $password;
                             header('Location: ' . $redirect_url);
                             exit;
                         }
