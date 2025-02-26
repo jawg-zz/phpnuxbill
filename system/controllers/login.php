@@ -50,7 +50,6 @@ switch ($do) {
                         $trx->plan_id = $_POST['plan_id'];
                         $trx->plan_name = $plan['name_plan'];
                         $trx->price = $plan['price'];
-                        $trx->phone_number = $_POST['phone_number'];
                         $trx->gateway = 'mpesa';
                         $trx->status = MPesaConfig::PENDING_STATUS; // Use constant for consistency
                         
@@ -60,7 +59,8 @@ switch ($do) {
                             'link_login' => $_POST['link_login'] ?? '',
                             'link_orig' => $_POST['link_orig'] ?? '',
                             'mac' => $_POST['mac'] ?? '',
-                            'ip' => $_POST['ip'] ?? ''
+                            'ip' => $_POST['ip'] ?? '',
+                            'phone_number' => $_POST['phone_number'] // Store it here if needed for reference
                         ];
                         $trx->pg_request = json_encode(['hotspot_data' => $hotspot_data]);
                         
@@ -78,7 +78,7 @@ switch ($do) {
                             _log('M-Pesa Validating Configuration', 'mpesa_debug');
                             MPesaConfig::validate();
                             
-                            // Format phone number
+                            // Use phone number directly from POST
                             $phone = $_POST['phone_number'];
                             _log('M-Pesa Phone Number: ' . $phone, 'mpesa_debug');
                             
