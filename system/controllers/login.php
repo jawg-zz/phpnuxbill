@@ -45,23 +45,29 @@ switch ($do) {
                         // Log plan details
                         _log('M-Pesa Plan Found: ' . json_encode($plan->as_array()), 'mpesa_debug');
 
+                        // Generate a unique username for this transaction
+                        $unique_username = 'hotspot_' . time() . '_' . mt_rand(1000, 9999);
+                        
                         // Create transaction record
                         $trx = ORM::for_table('tbl_payment_gateway')->create();
                         
-                        // Required fields based on database schema
-                        $trx->username = 'hotspot_' . time(); // Generate a temporary username
-                        $trx->name = 'M-Pesa Payment';
+                        // IMPORTANT: Set username first to ensure it's not missed
+                        $trx->username = $unique_username;
+                        
+                        // Set all other required fields
+                        $trx->user_id = 0; // Default user ID for guest transactions
                         $trx->gateway = 'mpesa';
+                        $trx->gateway_trx_id = ''; // Will be updated after STK push
                         $trx->plan_id = $_POST['plan_id'];
                         $trx->plan_name = $plan['name_plan'];
+                        $trx->routers_id = $plan['routers'] ?? 0;
+                        $trx->routers = $plan['routers_name'] ?? '';
                         $trx->price = $plan['price'];
-                        $trx->status = 1; // 1 = pending
-                        $trx->created_date = date('Y-m-d H:i:s');
-                        
-                        // Optional fields
-                        $trx->expired_date = date('Y-m-d H:i:s', strtotime('+1 hour'));
                         $trx->payment_method = 'M-Pesa';
                         $trx->payment_channel = 'STK Push';
+                        $trx->created_date = date('Y-m-d H:i:s');
+                        $trx->expired_date = date('Y-m-d H:i:s', strtotime('+1 hour'));
+                        $trx->status = 1; // 1 = pending
                         
                         // Store hotspot data in pg_request field
                         $hotspot_data = [
@@ -77,6 +83,7 @@ switch ($do) {
                         // Log transaction before save
                         _log('M-Pesa Transaction Before Save: ' . json_encode($trx->as_array()), 'mpesa_debug');
                         
+                        // Save the transaction
                         $trx->save();
                         
                         // Log transaction after save
