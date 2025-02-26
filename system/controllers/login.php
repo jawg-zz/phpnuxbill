@@ -47,18 +47,22 @@ switch ($do) {
 
                         // Create transaction record
                         $trx = ORM::for_table('tbl_payment_gateway')->create();
+                        
+                        // Required fields based on database schema
+                        $trx->username = 'hotspot_' . time(); // Generate a temporary username
+                        $trx->name = 'M-Pesa Payment';
+                        $trx->gateway = 'mpesa';
                         $trx->plan_id = $_POST['plan_id'];
                         $trx->plan_name = $plan['name_plan'];
                         $trx->price = $plan['price'];
-                        $trx->gateway = 'mpesa';
-                        $trx->status = MPesaConfig::PENDING_STATUS; // Use constant for consistency
-                        // Add username field - use a temporary value for hotspot login
-                        $trx->username = 'hotspot_' . time(); // Generate a temporary username
-                        // Add required created_date field
+                        $trx->status = 1; // 1 = pending
                         $trx->created_date = date('Y-m-d H:i:s');
-                        // Add expired_date field (optional but good to have)
-                        $trx->expired_date = date('Y-m-d H:i:s', strtotime('+1 day'));
-
+                        
+                        // Optional fields
+                        $trx->expired_date = date('Y-m-d H:i:s', strtotime('+1 hour'));
+                        $trx->payment_method = 'M-Pesa';
+                        $trx->payment_channel = 'STK Push';
+                        
                         // Store hotspot data in pg_request field
                         $hotspot_data = [
                             'hotspot_login' => isset($_POST['hotspot_login']),
@@ -66,13 +70,13 @@ switch ($do) {
                             'link_orig' => $_POST['link_orig'] ?? '',
                             'mac' => $_POST['mac'] ?? '',
                             'ip' => $_POST['ip'] ?? '',
-                            'phone_number' => $_POST['phone_number'] // Store it here if needed for reference
+                            'phone_number' => $_POST['phone_number']
                         ];
                         $trx->pg_request = json_encode(['hotspot_data' => $hotspot_data]);
-
+                        
                         // Log transaction before save
                         _log('M-Pesa Transaction Before Save: ' . json_encode($trx->as_array()), 'mpesa_debug');
-
+                        
                         $trx->save();
                         
                         // Log transaction after save
