@@ -221,8 +221,7 @@ function send_stk_push($request): array {
     $token = mpesa_get_token();
     
     $headers = [
-        'Authorization: Bearer ' . $token,
-        'Content-Type: application/json'
+        'Authorization: Bearer ' . $token
     ];
     
     $result = send_mpesa_request('mpesa/stkpush/v1/processrequest', $request, $headers);
