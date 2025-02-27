@@ -278,7 +278,6 @@ function mpesa_payment_notification(): void {
         handle_payment_result($trx, $result, $user ? $user->as_array() : null);
         
         // Return a success response to M-Pesa
-        header('Content-Type: application/json');
         echo json_encode(['ResultCode' => 0, 'ResultDesc' => 'Success']);
         
     } catch (Exception $e) {
@@ -290,7 +289,6 @@ function mpesa_payment_notification(): void {
         ], true);
         
         // Return an error response to M-Pesa
-        header('Content-Type: application/json');
         echo json_encode(['ResultCode' => 1, 'ResultDesc' => 'Error: ' . $e->getMessage()]);
     }
 }
@@ -451,8 +449,7 @@ function mpesa_get_token(): string {
         );
         
         $headers = [
-            'Authorization: Basic ' . $credentials,
-            'Content-Type: application/json'
+            'Authorization: Basic ' . $credentials
         ];
         
         $response = Http::getData(
