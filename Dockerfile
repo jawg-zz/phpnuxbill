@@ -1,8 +1,7 @@
 # Use the serversideup PHP image
-FROM serversideup/php:8.4-unit
+FROM serversideup/php:8.4-fpm
 
-# Expose port 8080 (as this image uses NGINX Unit instead of Apache)
-EXPOSE 8080
+EXPOSE 9000
 
 # Create required directories
 USER root
