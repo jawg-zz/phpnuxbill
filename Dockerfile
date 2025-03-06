@@ -1,6 +1,6 @@
 # Use the official PHP image with Apache
 FROM serversideup/php:8.4-unit
-EXPOSE 9000
+EXPOSE 8080
 # Create and configure config directory
 RUN mkdir -p /var/www/html/config
 
