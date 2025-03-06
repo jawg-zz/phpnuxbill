@@ -22,8 +22,18 @@
 			<h4> PHPNuxBill  Installer </h4>
 			<?php
 			if (isset($_GET['_error']) && ($_GET['_error']) == '1') {
-				echo '<h4 style="color: red;"> Unable to Connect Database, Please make sure database info is correct and try again ! </h4>';
-			}//
+				$error_message = isset($_GET['message']) ? htmlspecialchars($_GET['message']) : 'Unable to Connect Database';
+				echo '<div class="alert alert-danger">';
+				echo '<h4>Database Connection Error</h4>';
+				echo '<p>'. $error_message .'</p>';
+				echo '<p>Please make sure:</p>';
+				echo '<ul>';
+				echo '<li>Database server is running</li>';
+				echo '<li>Database credentials are correct</li>';
+				echo '<li>Database user has sufficient privileges</li>';
+				echo '</ul>';
+				echo '</div>';
+			}
 
 			$cururl = (((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')|| $_SERVER['SERVER_PORT'] == 443)?'https':'http').'://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
 			$appurl = str_replace('/install/step3.php', '', $cururl);

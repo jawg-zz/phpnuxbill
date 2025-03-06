@@ -12,22 +12,37 @@ $db_user = $_POST['dbuser'];
 $db_pass = $_POST['dbpass'];
 $db_name = $_POST['dbname'];
 $cn = '0';
+
 try {
-    $dbh = new pdo(
+    // First check if we can connect to MySQL server
+    $dbh = new PDO("mysql:host=$db_host", $db_user, $db_pass);
+    $dbh->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    
+    // Try to create database if it doesn't exist
+    $dbh->exec("CREATE DATABASE IF NOT EXISTS `$db_name` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci");
+    
+    // Now try to connect to the specific database
+    $dbh = new PDO(
         "mysql:host=$db_host;dbname=$db_name",
-        "$db_user",
-        "$db_pass",
+        $db_user,
+        $db_pass,
         array(PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION)
     );
+    
     $cn = '1';
-} catch (PDOException $ex) {
+    
+} catch (PDOException $e) {
     $cn = '0';
+    $error_message = $e->getMessage();
+    error_log("Database connection error: " . $error_message);
+    header("Location: step3.php?_error=1&message=" . urlencode($error_message));
+    exit;
 }
 
 if ($cn == '1') {
-        $input = '<?php
+    $input = '<?php
 
-$protocol = (!empty($_SERVER["HTTPS"]) && $_SERVER["HTTPS"] !== "off" || $_SERVER["SERVER_PORT"] == 443) ? "https://" : "https://";
+$protocol = (!empty($_SERVER["HTTPS"]) && $_SERVER["HTTPS"] !== "off" || $_SERVER["SERVER_PORT"] == 443) ? "https://" : "http://";
 $host = $_SERVER["HTTP_HOST"];
 $baseDir = rtrim(dirname($_SERVER["SCRIPT_NAME"]), "/\\\\");
 define("APP_URL", $protocol . $host . $baseDir);
