@@ -8,5 +8,5 @@ RUN mkdir -p /var/www/html/config
 COPY . /var/www/html
 
 # Set appropriate permissions
-RUN sudo chown -R www-data:www-data /var/www/html
-RUN sudo chmod -R 755 /var/www/html
+RUN chown -R www-data:www-data /var/www/html
+RUN chmod -R 755 /var/www/html
