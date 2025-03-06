@@ -20,6 +20,11 @@ if (isset($_GET['refresh'])) {
     r2(getUrl('dashboard'), 's', 'Data Refreshed');
 }
 
+$tipeUser = _req("user");
+if (empty($tipeUser)) {
+    $tipeUser = 'Admin';
+}
+$ui->assign('tipeUser', $tipeUser);
 
 $reset_day = $config['reset_day'];
 if (empty($reset_day)) {
@@ -36,7 +41,12 @@ $current_date = date('Y-m-d');
 $ui->assign('start_date', $start_date);
 $ui->assign('current_date', $current_date);
 
-$widgets = ORM::for_table('tbl_widgets')->selects("enabled", 1)->order_by_asc("orders")->findArray();
+$tipeUser = $admin['user_type'];
+if (in_array($tipeUser, ['SuperAdmin', 'Admin'])) {
+    $tipeUser = 'Admin';
+}
+
+$widgets = ORM::for_table('tbl_widgets')->where("enabled", 1)->where('user', $tipeUser)->order_by_asc("orders")->findArray();
 $count = count($widgets);
 for ($i = 0; $i < $count; $i++) {
     try{
