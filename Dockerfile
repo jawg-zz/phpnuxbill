@@ -6,6 +6,3 @@ RUN mkdir -p /var/www/html/config
 
 # copy contents into directory
 COPY . /var/www/html
-
-# Set working directory
-WORKDIR /var/www/html
