@@ -6,3 +6,7 @@ RUN mkdir -p /var/www/html/config
 
 # copy contents into directory
 COPY . /var/www/html
+
+# Set appropriate permissions
+RUN sudo chown -R www-data:www-data /var/www/html
+RUN sudo chmod -R 755 /var/www/html
