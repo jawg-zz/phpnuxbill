@@ -1,5 +1,5 @@
 # Use the official PHP image with Apache
-FROM php:7.4-apache
+FROM serversideup/php:8.4-unit
 EXPOSE 80
 # Install necessary PHP extensions
 RUN apt-get update && apt-get install -y \
