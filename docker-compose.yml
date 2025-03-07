@@ -2,6 +2,11 @@ services:
   nuxbill:
     pull_policy: always
     build: ./
+    target: development
+    args:
+        # UID and GID must be set as environment variables on the host machine
+        USER_ID: $UID
+        GROUP_ID: $GID
     environment:
       TZ: Africa/Nairobi
       UNIT_WEBROOT: /var/www/html
