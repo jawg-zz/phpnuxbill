@@ -7,16 +7,12 @@ FROM base AS development
 USER root
 
 # Save the build arguments as variables
-ARG USER_ID
-ARG GROUP_ID
+ARG USER_ID="1000"
+ARG GROUP_ID="1000"
 
-# Use the build arguments to change the UID 
-# and GID of www-data while also changing 
-# the file permissions for NGINX
-RUN docker-php-serversideup-set-id www-data $USER_ID:$GROUP_ID && \
-    \
-    # Update the file permissions for our NGINX service to match the new UID/GID
-    docker-php-serversideup-set-file-permissions --owner $USER_ID:$GROUP_ID --service nginx
+# Use the build arguments to change the UID and GID
+RUN docker-php-serversideup-set-id www-data "${USER_ID}:${GROUP_ID}" && \
+    docker-php-serversideup-set-file-permissions --owner "${USER_ID}:${GROUP_ID}" --service nginx
 
 RUN mkdir -p /var/www/html/config /var/www/html/system/uploads
 
