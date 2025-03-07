@@ -12,6 +12,8 @@ services:
     environment:
       TZ: Africa/Nairobi
       UNIT_WEBROOT: /var/www/html
+    ports:
+      - "8080:8080"
     volumes:
       - uploads:/var/www/html/system/uploads
       - config:/var/www/html/config
