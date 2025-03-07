@@ -10,13 +10,13 @@ USER root
 ARG USER_ID
 ARG GROUP_ID
 
-# Update www-data user/group IDs
-RUN if [ ! -z "$USER_ID" ]; then \
-        usermod -u $USER_ID www-data; \
-    fi && \
-    if [ ! -z "$GROUP_ID" ]; then \
-        groupmod -g $GROUP_ID www-data; \
-    fi
+# Use the build arguments to change the UID 
+# and GID of www-data while also changing 
+# the file permissions for NGINX
+RUN docker-php-serversideup-set-id www-data $USER_ID:$GROUP_ID && \
+    \
+    # Update the file permissions for our NGINX service to match the new UID/GID
+    docker-php-serversideup-set-file-permissions --owner $USER_ID:$GROUP_ID --service nginx
 
 RUN mkdir -p /var/www/html/config /var/www/html/system/uploads
 
