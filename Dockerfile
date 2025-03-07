@@ -1,7 +1,7 @@
 # Use the serversideup PHP image
-FROM serversideup/php:8.4-fpm
+FROM serversideup/php:8.4-unit
 
-EXPOSE 9000
+EXPOSE 8080
 
 # Create required directories
 USER root
