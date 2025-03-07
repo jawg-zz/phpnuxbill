@@ -7,8 +7,8 @@ services:
       context: ./
       target: development
       args:
-        USER_ID: ${UID:-1000}
-        GROUP_ID: ${GID:-1000}
+        USER_ID: $UID
+        GROUP_ID: $GID
     environment:
       TZ: Africa/Nairobi
       UNIT_WEBROOT: /var/www/html
