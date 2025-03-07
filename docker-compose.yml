@@ -1,12 +1,14 @@
+version: "3.8"
+
 services:
   nuxbill:
     pull_policy: always
-    build: ./
-    target: development
-    args:
-        # UID and GID must be set as environment variables on the host machine
-        USER_ID: $UID
-        GROUP_ID: $GID
+    build:
+      context: ./
+      target: development
+      args:
+        USER_ID: ${UID:-1000}
+        GROUP_ID: ${GID:-1000}
     environment:
       TZ: Africa/Nairobi
       UNIT_WEBROOT: /var/www/html
@@ -19,4 +21,8 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 10s
+
+volumes:
+  uploads:
       start_period: 10s
