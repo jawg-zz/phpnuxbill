@@ -12,7 +12,7 @@ ARG GROUP_ID="1000"
 
 # Use the build arguments to change the UID and GID
 RUN docker-php-serversideup-set-id www-data "${USER_ID}:${GROUP_ID}" && \
-    docker-php-serversideup-set-file-permissions --owner "${USER_ID}:${GROUP_ID}" --service nginx
+    docker-php-serversideup-set-file-permissions --owner "${USER_ID}:${GROUP_ID}" --service unit
 
 RUN mkdir -p /var/www/html/config /var/www/html/system/uploads
 
