@@ -31,9 +31,6 @@ USER www-data
 # Set working directory
 WORKDIR /var/www/html
 
-# Expose port for development
-EXPOSE 8080
-
 FROM base AS production
 
 RUN mkdir -p /var/www/html/config /var/www/html/system/uploads
@@ -43,6 +40,3 @@ COPY --chown=www-data:www-data . /var/www/html/
 USER www-data
 
 WORKDIR /var/www/html
-
-# Expose port for production
-EXPOSE 8080
