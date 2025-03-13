@@ -7,7 +7,7 @@ services:
     volumes:
       - uploads:/var/www/html/system/uploads
       - config:/var/www/html/config
-    network_mode: "container:wg-easy-h8occw0w08w0o044cs8o8ks4"
+    #network_mode: "container:wg-easy-h8occw0w08w0o044cs8o8ks4"
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost/ || exit 1"]
       interval: 30s
