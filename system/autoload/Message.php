@@ -17,15 +17,18 @@ require $root_path . 'system/autoload/mail/SMTP.php';
 class Message
 {
 
-    public static function sendTelegram($txt, $chat_id = null)
+    public static function sendTelegram($txt, $chat_id = null, $topik = '')
     {
         global $config;
-        run_hook('send_telegram', [$txt, $chat_id = null]); #HOOK
+        run_hook('send_telegram', [$txt, $chat_id, $topik]); #HOOK
         if (!empty($config['telegram_bot'])) {
             if (empty($chat_id)) {
                 $chat_id = $config['telegram_target_id'];
             }
-            return Http::getData('https://api.telegram.org/bot' . $config['telegram_bot'] . '/sendMessage?chat_id=' . $chat_id . '&text=' . urlencode($txt));
+            if (!empty($topik)) {
+                $topik = "message_thread_id=$topik&";
+            }
+            return Http::getData('https://api.telegram.org/bot' . $config['telegram_bot'] . '/sendMessage?'.$topik.'chat_id=' . $chat_id . '&text=' . urlencode($txt));
         }
     }
 
@@ -43,24 +46,32 @@ class Message
                     $txts = str_split($txt, 160);
                     try {
                         foreach ($txts as $txt) {
-                            self::MikrotikSendSMS($config['sms_url'], $phone, $txt);
+                            self::sendSMS($config['sms_url'], $phone, $txt);
+                            self::logMessage('SMS', $phone, $txt, 'Success');
                         }
-                    } catch (Exception $e) {
+                    } catch (Throwable $e) {
                         // ignore, add to logs
-                        _log("Failed to send SMS using Mikrotik.\n" . $e->getMessage(), 'SMS', 0);
+                        self::logMessage('SMS', $phone, $txt, 'Error', $e->getMessage());
                     }
                 } else {
                     try {
                         self::MikrotikSendSMS($config['sms_url'], $phone, $txt);
-                    } catch (Exception $e) {
+                        self::logMessage('MikroTikSMS', $phone, $txt, 'Success');
+                    } catch (Throwable $e) {
                         // ignore, add to logs
-                        _log("Failed to send SMS using Mikrotik.\n" . $e->getMessage(), 'SMS', 0);
+                        self::logMessage('MikroTikSMS', $phone, $txt, 'Error', $e->getMessage());
                     }
                 }
             } else {
                 $smsurl = str_replace('[number]', urlencode($phone), $config['sms_url']);
                 $smsurl = str_replace('[text]', urlencode($txt), $smsurl);
-                return Http::getData($smsurl);
+                try {
+                    $response = Http::getData($smsurl);
+                    self::logMessage('SMS HTTP Response', $phone, $txt, 'Success', $response);
+                    return $response;
+                } catch (Throwable $e) {
+                    self::logMessage('SMS HTTP Request', $phone, $txt, 'Error', $e->getMessage());
+                }
             }
         }
     }
@@ -92,11 +103,20 @@ class Message
         if (empty($txt)) {
             return "kosong";
         }
-        run_hook('send_whatsapp', [$phone, $txt]); #HOOK
+
+        run_hook('send_whatsapp', [$phone, $txt]); // HOOK
+
         if (!empty($config['wa_url'])) {
             $waurl = str_replace('[number]', urlencode(Lang::phoneFormat($phone)), $config['wa_url']);
             $waurl = str_replace('[text]', urlencode($txt), $waurl);
-            return Http::getData($waurl);
+
+            try {
+                $response = Http::getData($waurl);
+                self::logMessage('WhatsApp HTTP Response', $phone, $txt, 'Success', $response);
+                return $response;
+            } catch (Throwable $e) {
+                self::logMessage('WhatsApp HTTP Request', $phone, $txt, 'Error', $e->getMessage());
+            }
         }
     }
 
@@ -110,6 +130,7 @@ class Message
             return "";
         }
         run_hook('send_email', [$to, $subject, $body]); #HOOK
+        self::logMessage('Email', $to, $body, 'Success');
         if (empty($config['smtp_host'])) {
             $attr = "";
             if (!empty($config['mail_from'])) {
@@ -125,12 +146,12 @@ class Message
             if (isset($debug_mail) && $debug_mail == 'Dev') {
                 $mail->SMTPDebug = SMTP::DEBUG_SERVER;
             }
-            $mail->Host       = $config['smtp_host'];
-            $mail->SMTPAuth   = true;
-            $mail->Username   = $config['smtp_user'];
-            $mail->Password   = $config['smtp_pass'];
+            $mail->Host = $config['smtp_host'];
+            $mail->SMTPAuth = true;
+            $mail->Username = $config['smtp_user'];
+            $mail->Password = $config['smtp_pass'];
             $mail->SMTPSecure = $config['smtp_ssltls'];
-            $mail->Port       = $config['smtp_port'];
+            $mail->Port = $config['smtp_port'];
             if (!empty($config['mail_from'])) {
                 $mail->setFrom($config['mail_from']);
             }
@@ -154,13 +175,16 @@ class Message
                 $html = str_replace('[[Company_Name]]', nl2br($config['CompanyName']), $html);
                 $html = str_replace('[[Body]]', nl2br($body), $html);
                 $mail->isHTML(true);
-                $mail->Body    = $html;
+                $mail->Body = $html;
             } else {
                 $mail->isHTML(false);
-                $mail->Body    = $body;
+                $mail->Body = $body;
             }
             if (!$mail->send()) {
-                _log(Lang::T("Email not sent, Mailer Error: ") . $mail->ErrorInfo);
+                $errorMessage = Lang::T("Email not sent, Mailer Error: ") . $mail->ErrorInfo;
+                self::logMessage('Email', $to, $body, 'Error', $errorMessage);
+            } else {
+                self::logMessage('Email', $to, $body, 'Success');
             }
 
             //<p style="font-family: Helvetica, sans-serif; font-size: 16px; font-weight: normal; margin: 0; margin-bottom: 16px;">
@@ -198,7 +222,7 @@ class Message
         $tax_enable = isset($config['enable_tax']) ? $config['enable_tax'] : 'no';
         if ($tax_enable === 'yes') {
             $tax_rate_setting = isset($config['tax_rate']) ? $config['tax_rate'] : null;
-            $custom_tax_rate = isset($config['custom_tax_rate']) ? (float)$config['custom_tax_rate'] : null;
+            $custom_tax_rate = isset($config['custom_tax_rate']) ? (float) $config['custom_tax_rate'] : null;
 
             $tax_rate = ($tax_rate_setting === 'custom') ? $custom_tax_rate : $tax_rate_setting;
             $tax = Package::tax($price, $tax_rate);
@@ -295,7 +319,7 @@ class Message
         $textInvoice = str_replace('[[payment_channel]]', trim($gc[1]), $textInvoice);
         $textInvoice = str_replace('[[type]]', $trx['type'], $textInvoice);
         $textInvoice = str_replace('[[plan_name]]', $trx['plan_name'], $textInvoice);
-        $textInvoice = str_replace('[[plan_price]]',  Lang::moneyFormat($trx['price']), $textInvoice);
+        $textInvoice = str_replace('[[plan_price]]', Lang::moneyFormat($trx['price']), $textInvoice);
         $textInvoice = str_replace('[[name]]', $cust['fullname'], $textInvoice);
         $textInvoice = str_replace('[[note]]', $cust['note'], $textInvoice);
         $textInvoice = str_replace('[[user_name]]', $trx['username'], $textInvoice);
@@ -304,6 +328,42 @@ class Message
         $textInvoice = str_replace('[[password]]', $cust['password'], $textInvoice);
         $textInvoice = str_replace('[[expired_date]]', Lang::dateAndTimeFormat($trx['expiration'], $trx['time']), $textInvoice);
         $textInvoice = str_replace('[[footer]]', $config['note'], $textInvoice);
+		// Calculate bills and additional costs
+        list($bills, $add_cost) = User::getBills($cust['id']);
+
+        // Initialize note and total variables
+        $note = "";
+        $total = $trx['price'];
+
+        // Add bills to the note if there are any additional costs
+        if ($add_cost != 0) {
+            foreach ($bills as $k => $v) {
+                $note .= $k . " : " . Lang::moneyFormat($v) . "\n";
+            }
+            $total += $add_cost;
+        }
+
+        // Calculate tax
+        $tax = 0;
+        $tax_enable = isset($config['enable_tax']) ? $config['enable_tax'] : 'no';
+        if ($tax_enable === 'yes') {
+            $tax_rate_setting = isset($config['tax_rate']) ? $config['tax_rate'] : null;
+            $custom_tax_rate = isset($config['custom_tax_rate']) ? (float) $config['custom_tax_rate'] : null;
+
+            $tax_rate = ($tax_rate_setting === 'custom') ? $custom_tax_rate : $tax_rate_setting;
+            $tax = Package::tax($trx['price'], $tax_rate);
+
+            if ($tax != 0) {
+                $note .= "Tax : " . Lang::moneyFormat($tax) . "\n";
+                $total += $tax;
+            }
+        }
+
+        // Add total to the note
+        $note .= "Total : " . Lang::moneyFormat($total) . "\n";
+
+		// Replace placeholders in the message
+        $textInvoice = str_replace('[[bills]]', $note, $textInvoice);
 
         if ($config['user_notification_payment'] == 'sms') {
             Message::sendSMS($cust['phonenumber'], $textInvoice);
@@ -317,12 +377,42 @@ class Message
 
     public static function addToInbox($to_customer_id, $subject, $body, $from = 'System')
     {
-        $v = ORM::for_table('tbl_customers_inbox')->create();
-        $v->from = $from;
-        $v->customer_id = $to_customer_id;
-        $v->subject = $subject;
-        $v->date_created = date('Y-m-d H:i:s');
-        $v->body = nl2br($body);
-        $v->save();
+        $user = User::find($to_customer_id);
+        try {
+            $v = ORM::for_table('tbl_customers_inbox')->create();
+            $v->from = $from;
+            $v->customer_id = $to_customer_id;
+            $v->subject = $subject;
+            $v->date_created = date('Y-m-d H:i:s');
+            $v->body = nl2br($body);
+            $v->save();
+            self::logMessage("Inbox", $user->username, $body, "Success");
+        } catch (Throwable $e) {
+            $errorMessage = Lang::T("Error adding message to inbox: " . $e->getMessage());
+            self::logMessage('Inbox', $user->username, $body, 'Error', $errorMessage);
+        }
+    }
+
+    public static function getMessageType($type, $message){
+        if(strpos($message, "<divider>") === false){
+            return $message;
+        }
+        $msgs = explode("<divider>", $message);
+        if($type == "PPPOE"){
+            return $msgs[1];
+        }else{
+            return $msgs[0];
+        }
+    }
+
+    public static function logMessage($messageType, $recipient, $messageContent, $status, $errorMessage = null)
+    {
+        $log = ORM::for_table('tbl_message_logs')->create();
+        $log->message_type = $messageType;
+        $log->recipient = $recipient;
+        $log->message_content = $messageContent;
+        $log->status = $status;
+        $log->error_message = $errorMessage;
+        $log->save();
     }
 }

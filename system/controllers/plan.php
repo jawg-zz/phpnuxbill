@@ -107,15 +107,15 @@ switch ($action) {
             $cust = User::_info($id_customer);
             $plan = ORM::for_table('tbl_plans')->find_one($planId);
             list($bills, $add_cost) = User::getBills($id_customer);
-			$add_inv = User::getAttribute("Invoice", $id_customer);
-			if (!empty($add_inv)) {
-				$plan['price'] = $add_inv;
-			}
+            $add_inv = User::getAttribute("Invoice", $id_customer);
+            if (!empty($add_inv)) {
+                $plan['price'] = $add_inv;
+            }
 
             // Tax calculation start
             $tax_enable = isset($config['enable_tax']) ? $config['enable_tax'] : 'no';
             $tax_rate_setting = isset($config['tax_rate']) ? $config['tax_rate'] : null;
-            $custom_tax_rate = isset($config['custom_tax_rate']) ? (float)$config['custom_tax_rate'] : null;
+            $custom_tax_rate = isset($config['custom_tax_rate']) ? (float) $config['custom_tax_rate'] : null;
 
             if ($tax_rate_setting === 'custom') {
                 $tax_rate = $custom_tax_rate;
@@ -164,7 +164,7 @@ switch ($action) {
             $ui->assign('server', $server);
             $ui->assign('using', $using);
             $ui->assign('plan', $plan);
-			$ui->assign('add_inv', $add_inv);
+            $ui->assign('add_inv', $add_inv);
             $ui->display('admin/plan/recharge-confirm.tpl');
         } else {
             r2(getUrl('plan/recharge'), 'e', $msg);
@@ -205,7 +205,7 @@ switch ($action) {
             // Tax calculation start
             $tax_enable = isset($config['enable_tax']) ? $config['enable_tax'] : 'no';
             $tax_rate_setting = isset($config['tax_rate']) ? $config['tax_rate'] : null;
-            $custom_tax_rate = isset($config['custom_tax_rate']) ? (float)$config['custom_tax_rate'] : null;
+            $custom_tax_rate = isset($config['custom_tax_rate']) ? (float) $config['custom_tax_rate'] : null;
 
             if ($tax_rate_setting === 'custom') {
                 $tax_rate = $custom_tax_rate;
@@ -269,6 +269,17 @@ switch ($action) {
             r2(getUrl('plan/view/') . $id, 'd', "Customer not found");
         }
         Package::createInvoice($in);
+        $UPLOAD_URL_PATH = str_replace($root_path, '', $UPLOAD_PATH);
+        $logo = '';
+        if (file_exists($UPLOAD_PATH . DIRECTORY_SEPARATOR . 'logo.png')) {
+            $logo = $UPLOAD_URL_PATH . DIRECTORY_SEPARATOR . 'logo.png';
+            $imgsize = getimagesize($logo);
+            $width = $imgsize[0];
+            $height = $imgsize[1];
+            $ui->assign('wlogo', $width);
+            $ui->assign('hlogo', $height);
+        }
+        $ui->assign('logo', $logo);
         $ui->assign('_title', 'View Invoice');
         $ui->display('admin/plan/invoice.tpl');
         break;
@@ -299,7 +310,7 @@ switch ($action) {
         if (!in_array($admin['user_type'], ['SuperAdmin', 'Admin', 'Agent'])) {
             _alert(Lang::T('You do not have permission to access this page'), 'danger', "dashboard");
         }
-        $id  = $routes['2'];
+        $id = $routes['2'];
         $d = ORM::for_table('tbl_user_recharges')->find_one($id);
         if ($d) {
             $ui->assign('d', $d);
@@ -329,7 +340,7 @@ switch ($action) {
         if (!in_array($admin['user_type'], ['SuperAdmin', 'Admin'])) {
             _alert(Lang::T('You do not have permission to access this page'), 'danger', "dashboard");
         }
-        $id  = $routes['2'];
+        $id = $routes['2'];
         $d = ORM::for_table('tbl_user_recharges')->find_one($id);
         if ($d) {
             run_hook('delete_customer_active_plan'); #HOOK
@@ -453,7 +464,7 @@ switch ($action) {
         $append_url = "&search=" . urlencode($search) . "&router=" . urlencode($router) . "&customer=" . urlencode($customer) . "&plan=" . urlencode($plan) . "&status=" . urlencode($status);
 
         // option customers
-        $ui->assign('customers',  ORM::for_table('tbl_voucher')->distinct()->select("user")->whereNotEqual("user", '0')->findArray());
+        $ui->assign('customers', ORM::for_table('tbl_voucher')->distinct()->select("user")->whereNotEqual("user", '0')->findArray());
         // option plans
         $plns = ORM::for_table('tbl_voucher')->distinct()->select("id_plan")->findArray();
         if (count($plns) > 0) {
@@ -563,9 +574,11 @@ switch ($action) {
         if (empty($vpl)) {
             $vpl = 3;
         }
-        if ($pagebreak < 1) $pagebreak = 12;
+        if ($pagebreak < 1)
+            $pagebreak = 12;
 
-        if ($limit < 1) $limit = $pagebreak * 2;
+        if ($limit < 1)
+            $limit = $pagebreak * 2;
         if (empty($from_id)) {
             $from_id = 0;
         }
@@ -626,7 +639,7 @@ switch ($action) {
             $v = ORM::for_table('tbl_plans')
                 ->left_outer_join('tbl_voucher', array('tbl_plans.id', '=', 'tbl_voucher.id_plan'))
                 ->where('tbl_voucher.status', '0')
-				->where('tbl_voucher.created_at', $selected_datetime)
+                ->where('tbl_voucher.created_at', $selected_datetime)
                 ->limit($limit);
             $vc = ORM::for_table('tbl_plans')
                 ->left_outer_join('tbl_voucher', array('tbl_plans.id', '=', 'tbl_voucher.id_plan'))
@@ -696,6 +709,9 @@ switch ($action) {
     case 'voucher-post':
         if (!in_array($admin['user_type'], ['SuperAdmin', 'Admin', 'Agent', 'Sales'])) {
             _alert(Lang::T('You do not have permission to access this page'), 'danger', "dashboard");
+        }
+        if ($_app_stage == 'Demo') {
+            r2(getUrl('plan/add-voucher/'), 'e', 'You cannot perform this action in Demo mode');
         }
 
         $type = _post('type');
@@ -907,7 +923,7 @@ switch ($action) {
         if (!in_array($admin['user_type'], ['SuperAdmin', 'Admin'])) {
             _alert(Lang::T('You do not have permission to access this page'), 'danger', "dashboard");
         }
-        $id  = $routes['2'];
+        $id = $routes['2'];
         run_hook('delete_voucher'); #HOOK
         $d = ORM::for_table('tbl_voucher')->find_one($id);
         if ($d) {
@@ -1057,11 +1073,11 @@ switch ($action) {
             } else {
                 r2(getUrl('plan'), 's', "Customer not found");
             }
-            Message::sendTelegram("#u$tur[username] #extend #" . $p['type'] . " \n" . $p['name_plan'] .
+            Message::sendTelegram("#u$tur[username] #id$tur[customer_id]  #extend by $admin[fullname] #" . $p['type'] . " \n" . $p['name_plan'] .
                 "\nLocation: " . $p['routers'] .
                 "\nCustomer: " . $c['fullname'] .
                 "\nNew Expired: " . Lang::dateAndTimeFormat($expiration, $tur['time']));
-            _log("$admin[fullname] extend Customer $tur[customer_id] $tur[username] for $days days", $admin['user_type'], $admin['id']);
+            _log("$admin[fullname] extend Customer $tur[customer_id] $tur[username] #$tur[customer_id] for $days days", $admin['user_type'], $admin['id']);
             r2(getUrl('plan'), 's', "Extend until $expiration");
         } else {
             r2(getUrl('plan'), 's', "Customer is not expired yet");
