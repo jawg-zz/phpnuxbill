@@ -7,6 +7,8 @@ class MPesaGateway
 {
     private array $config;
     private string $baseUrl;
+    private const MAX_RETRIES = 3;
+    private const RETRY_DELAY = 1; // seconds
 
     public function __construct(array $config)
     {
@@ -42,7 +44,7 @@ class MPesaGateway
             'TransactionDesc' => $transactionDesc
         ];
 
-        return $this->makeRequest('mpesa/stkpush/v1/processrequest', $payload);
+        return $this->makeRequestWithRetry('mpesa/stkpush/v1/processrequest', $payload);
     }
 
     /**
@@ -60,7 +62,42 @@ class MPesaGateway
             'CheckoutRequestID' => $checkoutRequestId
         ];
 
-        return $this->makeRequest('mpesa/stkpushquery/v1/query', $payload);
+        return $this->makeRequestWithRetry('mpesa/stkpushquery/v1/query', $payload);
+    }
+
+    /**
+     * Makes an authenticated request to the M-Pesa API with retry mechanism
+     */
+    private function makeRequestWithRetry(string $endpoint, array $payload, int $maxRetries = self::MAX_RETRIES): array
+    {
+        $attempts = 0;
+        $lastException = null;
+
+        while ($attempts < $maxRetries) {
+            try {
+                return $this->makeRequest($endpoint, $payload);
+            } catch (Exception $e) {
+                $lastException = $e;
+                $attempts++;
+                
+                if ($attempts === $maxRetries) {
+                    throw new PaymentException(
+                        'API request failed after ' . $maxRetries . ' attempts',
+                        PaymentException::API_CONNECTION_ERROR,
+                        [
+                            'endpoint' => $endpoint,
+                            'attempts' => $attempts,
+                            'last_error' => $e->getMessage()
+                        ],
+                        $e
+                    );
+                }
+                
+                sleep(self::RETRY_DELAY);
+            }
+        }
+
+        throw $lastException;
     }
 
     /**
@@ -70,7 +107,8 @@ class MPesaGateway
     {
         $token = $this->getAccessToken();
         $headers = [
-            'Authorization: Bearer ' . $token
+            'Authorization: Bearer ' . $token,
+            'Content-Type: application/json'
         ];
 
         $response = Http::postJsonData(
@@ -100,7 +138,11 @@ class MPesaGateway
         $result = $this->handleResponse($response);
 
         if (!isset($result['access_token'])) {
-            throw new Exception('Failed to get access token');
+            throw new PaymentException(
+                'Failed to get access token',
+                PaymentException::API_CONNECTION_ERROR,
+                ['response' => $result]
+            );
         }
 
         return $result['access_token'];
@@ -137,7 +179,11 @@ class MPesaGateway
         
         foreach ($required as $field) {
             if (empty($config[$field])) {
-                throw new Exception("Missing required configuration: $field");
+                throw new PaymentException(
+                    "Missing required configuration: $field",
+                    PaymentException::INVALID_CONFIGURATION,
+                    ['field' => $field]
+                );
             }
         }
     }
@@ -148,16 +194,28 @@ class MPesaGateway
     private function handleResponse(string $response): array
     {
         if (empty($response)) {
-            throw new Exception('Empty response from M-Pesa API');
+            throw new PaymentException(
+                'Empty response from M-Pesa API',
+                PaymentException::INVALID_RESPONSE,
+                ['response' => $response]
+            );
         }
 
         $result = json_decode($response, true);
         if (!$result) {
-            throw new Exception('Invalid JSON response: ' . $response);
+            throw new PaymentException(
+                'Invalid JSON response',
+                PaymentException::INVALID_RESPONSE,
+                ['response' => $response]
+            );
         }
 
         if (isset($result['errorCode'])) {
-            throw new Exception($result['errorMessage'] ?? 'Unknown API error');
+            throw new PaymentException(
+                $result['errorMessage'] ?? 'Unknown API error',
+                PaymentException::API_CONNECTION_ERROR,
+                ['error_code' => $result['errorCode'], 'response' => $result]
+            );
         }
 
         return $result;
@@ -170,8 +228,10 @@ class MPesaGateway
 class MPesaConfig {
     private array $config;
     
+    const PENDING_STATUS = 0;
     const PAID_STATUS = 1;
     const FAILED_STATUS = 2;
+    const EXPIRED_STATUS = 3;
     
     public function __construct(array $config) {
         $this->config = $config;
@@ -182,7 +242,11 @@ class MPesaConfig {
         
         foreach ($required as $field) {
             if (empty($this->config[$field])) {
-                throw new PaymentException("Missing required configuration: $field");
+                throw new PaymentException(
+                    "Missing required configuration: $field",
+                    PaymentException::INVALID_CONFIGURATION,
+                    ['field' => $field]
+                );
             }
         }
     }
@@ -224,6 +288,8 @@ class PaymentException extends Exception {
     const PAYMENT_FAILED = 1006;
     const PACKAGE_ACTIVATION_ERROR = 1007;
     const INVALID_CALLBACK = 1008;
+    const AMOUNT_MISMATCH = 1009;
+    const TRANSACTION_EXPIRED = 1010;
     
     /**
      * Additional payment context data
@@ -341,6 +407,28 @@ class PaymentException extends Exception {
         return new self(
             'Invalid callback data received',
             self::INVALID_CALLBACK
+        );
+    }
+
+    /**
+     * Creates an exception for amount mismatch
+     */
+    public static function amountMismatch(float $expected, float $received): self {
+        return new self(
+            "Payment amount mismatch. Expected: $expected, Received: $received",
+            self::AMOUNT_MISMATCH,
+            ['expected' => $expected, 'received' => $received]
+        );
+    }
+
+    /**
+     * Creates an exception for expired transactions
+     */
+    public static function transactionExpired(string $transactionId): self {
+        return new self(
+            "Transaction expired: $transactionId",
+            self::TRANSACTION_EXPIRED,
+            ['transaction_id' => $transactionId]
         );
     }
 }

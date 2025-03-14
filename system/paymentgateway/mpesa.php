@@ -6,6 +6,9 @@
  * Payment Gateway M-Pesa
  **/
 
+// Include the MPesaGateway class from lib directory
+require_once __DIR__ . '/lib/mpesaGateway.php';
+
 function mpesa_validate_config()
 {
     global $config;
@@ -77,11 +80,26 @@ function mpesa_create_transaction($trx, $user)
         update_transaction_record($trx['id'], [
             'gateway_trx_id' => $stkPushResult['CheckoutRequestID'],
             'pg_request' => json_encode($stkPushResult),
-            'expired_date' => date('Y-m-d H:i:s', strtotime('+ 4 HOURS'))
+            'expired_date' => date('Y-m-d H:i:s', strtotime('+ 4 HOURS')),
+            'status' => MPesaConfig::PENDING_STATUS
         ]);
 
         r2(U . "order/view/" . $trx['id'], 's', Lang::T("Please check your phone to complete payment"));
         
+    } catch (PaymentException $e) {
+        log_error('mpesa_create_transaction', $e->getMessage(), [
+            'trx_id' => $trx['id'],
+            'user' => $user['username'],
+            'context' => $e->getContext()
+        ]);
+        
+        $errorMessage = match($e->getCode()) {
+            PaymentException::INVALID_PHONE_NUMBER => Lang::T("Invalid phone number format. Please use a valid Kenyan phone number."),
+            PaymentException::API_CONNECTION_ERROR => Lang::T("Failed to connect to M-Pesa. Please try again."),
+            default => Lang::T("Failed to create transaction. Please try again.")
+        };
+        
+        r2(U . 'order/package', 'e', $errorMessage);
     } catch (Exception $e) {
         log_error('mpesa_create_transaction', $e->getMessage(), [
             'trx_id' => $trx['id'],
@@ -93,21 +111,33 @@ function mpesa_create_transaction($trx, $user)
 
 function mpesa_get_status($trx, $user)
 {
-    if ($trx['status'] == 2) {
+    if ($trx['status'] == MPesaConfig::PAID_STATUS) {
         r2(U . "order/view/" . $trx['id'], 'd', Lang::T("Transaction has been paid."));
     }
 
     try {
+        // Check if transaction has expired
+        if (check_transaction_timeout($trx)) {
+            r2(U . "order/view/" . $trx['id'], 'w', Lang::T("Transaction has expired. Please create a new one."));
+        }
+
         $mpesa = get_mpesa_gateway();
         $result = $mpesa->queryTransactionStatus($trx['gateway_trx_id']);
 
         if ($result['ResultCode'] === '0') {
-            process_successful_payment($trx, $user);
+            process_successful_payment($trx, $user, $result);
             r2(U . "order/view/" . $trx['id'], 's', Lang::T("Transaction has been paid."));
         } else {
             r2(U . "order/view/" . $trx['id'], 'w', Lang::T("Transaction still unpaid."));
         }
         
+    } catch (PaymentException $e) {
+        log_error('mpesa_get_status', $e->getMessage(), [
+            'trx_id' => $trx['id'],
+            'user' => $user['username'],
+            'context' => $e->getContext()
+        ]);
+        r2(U . "order/view/" . $trx['id'], 'e', Lang::T("Failed to check transaction status."));
     } catch (Exception $e) {
         log_error('mpesa_get_status', $e->getMessage(), [
             'trx_id' => $trx['id'],
@@ -124,7 +154,7 @@ function mpesa_payment_notification()
         $callback = json_decode($input, true);
 
         if (!isset($callback['Body']['stkCallback'])) {
-            throw new Exception('Invalid callback data');
+            throw PaymentException::invalidCallback();
         }
 
         $result = $callback['Body']['stkCallback'];
@@ -133,12 +163,21 @@ function mpesa_payment_notification()
         if ($result['ResultCode'] === 0) {
             $trx = get_transaction($trx_id);
             if (!$trx) {
-                throw new Exception('Transaction not found: ' . $trx_id);
+                throw PaymentException::transactionNotFound($trx_id);
+            }
+
+            // Check if transaction has expired
+            if (check_transaction_timeout($trx)) {
+                throw PaymentException::transactionExpired($trx_id);
             }
 
             $user = get_user($trx['user_id']);
             if (!$user) {
-                throw new Exception('User not found for transaction: ' . $trx_id);
+                throw new PaymentException(
+                    'User not found for transaction: ' . $trx_id,
+                    PaymentException::TRANSACTION_NOT_FOUND,
+                    ['trx_id' => $trx_id]
+                );
             }
 
             process_successful_payment($trx, $user, $result);
@@ -152,6 +191,13 @@ function mpesa_payment_notification()
         http_response_code(200);
         die('OK');
         
+    } catch (PaymentException $e) {
+        log_error('mpesa_callback_error', $e->getMessage(), [
+            'input' => $input ?? null,
+            'context' => $e->getContext()
+        ]);
+        http_response_code(400);
+        die('Error');
     } catch (Exception $e) {
         log_error('mpesa_callback_error', $e->getMessage(), [
             'input' => $input ?? null
@@ -180,7 +226,7 @@ function validate_phone_number($phone)
     if (preg_match('/^(?:254|0)?(7\d{8})$/', $phone, $matches)) {
         return '254' . $matches[1];
     }
-    throw new Exception('Invalid phone number format');
+    throw PaymentException::invalidPhoneNumber($phone);
 }
 
 function update_transaction_record($id, array $data)
@@ -206,13 +252,18 @@ function get_user($id)
 
 function process_successful_payment($trx, $user, $mpesaResult = null)
 {
-    if ($trx['status'] == 2) {
+    if ($trx['status'] == MPesaConfig::PAID_STATUS) {
         return; // Already processed
+    }
+
+    // Validate payment amount
+    if (isset($mpesaResult['Amount']) && $mpesaResult['Amount'] != $trx['price']) {
+        throw PaymentException::amountMismatch($trx['price'], $mpesaResult['Amount']);
     }
 
     // Activate the package
     if (!Package::rechargeUser($user['id'], $trx['routers'], $trx['plan_id'], 'mpesa', 'M-Pesa')) {
-        throw new Exception('Failed to activate package');
+        throw PaymentException::packageActivationError('Failed to activate package');
     }
 
     // Update transaction record
@@ -221,8 +272,54 @@ function process_successful_payment($trx, $user, $mpesaResult = null)
         'payment_method' => 'M-Pesa',
         'payment_channel' => 'STK Push',
         'paid_date' => date('Y-m-d H:i:s'),
-        'status' => 2
+        'status' => MPesaConfig::PAID_STATUS
     ]);
+}
+
+function check_transaction_timeout($trx)
+{
+    if (strtotime($trx['expired_date']) < time()) {
+        update_transaction_record($trx['id'], [
+            'status' => MPesaConfig::EXPIRED_STATUS,
+            'pg_paid_response' => json_encode(['error' => 'Transaction expired'])
+        ]);
+        return true;
+    }
+    return false;
+}
+
+function reconcile_transactions()
+{
+    $pending = ORM::for_table('tbl_payment_gateway')
+        ->where('status', MPesaConfig::PENDING_STATUS)
+        ->find_many();
+        
+    foreach ($pending as $trx) {
+        if (check_transaction_timeout($trx)) {
+            continue;
+        }
+        
+        try {
+            $mpesa = get_mpesa_gateway();
+            $result = $mpesa->queryTransactionStatus($trx['gateway_trx_id']);
+            
+            if ($result['ResultCode'] === '0') {
+                $user = get_user($trx['user_id']);
+                if ($user) {
+                    process_successful_payment($trx, $user, $result);
+                }
+            }
+        } catch (PaymentException $e) {
+            log_error('reconciliation_error', $e->getMessage(), [
+                'trx_id' => $trx['id'],
+                'context' => $e->getContext()
+            ]);
+        } catch (Exception $e) {
+            log_error('reconciliation_error', $e->getMessage(), [
+                'trx_id' => $trx['id']
+            ]);
+        }
+    }
 }
 
 function log_error($action, $message, array $context = [])

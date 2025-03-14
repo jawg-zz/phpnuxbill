@@ -39,7 +39,7 @@
                         </tr>
                         <tr>
                             <td>{Lang::T('Plan Price')}</td>
-                            <td>{Lang::moneyFormat($plan['price'])}</td>
+                            <td>{Lang::moneyFormat($trx['price'])}</td>
                         </tr>
                         <tr>
                             <td>{Lang::T('Created Date')}</td>
@@ -60,6 +60,12 @@
                                     <td>{$trx['gateway_trx_id']}</td>
                                 </tr>
                             {/if}
+                        {/if}
+                        {if $trx['gateway'] eq 'mpesa' && isset($trx['gateway_trx_id']) && $trx['status']==1}
+                            <tr>
+                                <td>{Lang::T('M-Pesa Reference')}</td>
+                                <td>{$trx['gateway_trx_id']}</td>
+                            </tr>
                         {/if}
                     </tbody>
                 </table>
@@ -94,16 +100,24 @@
                                         </ol>
                                         <p class="mt-2">{Lang::T('If you did not receive the STK Push, click Retry Payment below')}</p>
                                     </div>
+                                    <div class="btn-group btn-group-justified mb10">
+                                        <a href="{$_url}order/view/{$trx['id']}/check" class="btn btn-info btn-lg">
+                                            <i class="fa fa-refresh"></i> {Lang::T('Check Status')}
+                                        </a>
+                                    </div>
                                     <div class="btn-group btn-group-justified">
                                         <form method="POST" action="{$_url}order/buy/{$plan['id']}/{$router['id']}">
                                             <input type="hidden" name="gateway" value="mpesa">
                                             <button type="submit" class="btn btn-warning">
-                                                {Lang::T('Retry Payment')}
+                                                <i class="fa fa-repeat"></i> {Lang::T('Retry Payment')}
                                             </button>
                                         </form>
-                                        <a href="{$_url}order/view/{$trx['id']}/check" class="btn btn-info">
-                                            {Lang::T('Check Status')}
+                                        <a href="{$_url}order/package" class="btn btn-default">
+                                            <i class="fa fa-shopping-cart"></i> {Lang::T('Other Payment Options')}
                                         </a>
+                                    </div>
+                                    <div class="alert alert-info mt10">
+                                        <i class="fa fa-info-circle"></i> {Lang::T('Page will auto-refresh to check payment status')}
                                     </div>
                                 {/if}
                             </div>

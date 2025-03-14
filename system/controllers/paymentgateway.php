@@ -45,6 +45,51 @@ switch ($action) {
         $ui->assign('pg', $d);
         $ui->display('admin/paymentgateway/audit-view.tpl');
         break;
+    case 'check-mpesa-status':
+        $trx_id = alphanumeric($routes[2]);
+        $trx = ORM::for_table('tbl_payment_gateway')->find_one($trx_id);
+        
+        if (!$trx) {
+            r2(getUrl('paymentgateway/audit/mpesa'), 'e', Lang::T('Transaction not found'));
+        }
+        
+        if ($trx['gateway'] !== 'mpesa') {
+            r2(getUrl('paymentgateway/audit/' . $trx['gateway']), 'e', Lang::T('Not an M-Pesa transaction'));
+        }
+        
+        if ($trx['status'] == 2) {
+            r2(getUrl('paymentgateway/auditview/' . $trx_id), 'd', Lang::T('Transaction already paid'));
+        }
+        
+        // Check if transaction has expired
+        if (strtotime($trx['expired_date']) < time()) {
+            $trx->status = 3; // Failed status
+            $trx->pg_paid_response = json_encode(['error' => 'Transaction expired']);
+            $trx->save();
+            r2(getUrl('paymentgateway/auditview/' . $trx_id), 'w', Lang::T('Transaction has expired'));
+        }
+        
+        try {
+            include $PAYMENTGATEWAY_PATH . DIRECTORY_SEPARATOR . 'mpesa.php';
+            
+            $mpesa = get_mpesa_gateway();
+            $result = $mpesa->queryTransactionStatus($trx['gateway_trx_id']);
+            
+            if ($result['ResultCode'] === '0') {
+                $user = ORM::for_table('tbl_customers')->find_one($trx['user_id']);
+                if (!$user) {
+                    r2(getUrl('paymentgateway/auditview/' . $trx_id), 'e', Lang::T('User not found'));
+                }
+                
+                process_successful_payment($trx, $user, $result);
+                r2(getUrl('paymentgateway/auditview/' . $trx_id), 's', Lang::T('Payment verified successfully'));
+            } else {
+                r2(getUrl('paymentgateway/auditview/' . $trx_id), 'w', Lang::T('Transaction still unpaid'));
+            }
+        } catch (Exception $e) {
+            r2(getUrl('paymentgateway/auditview/' . $trx_id), 'e', $e->getMessage());
+        }
+        break;
     default:
         if (_post('save') == 'actives') {
             $pgs = '';

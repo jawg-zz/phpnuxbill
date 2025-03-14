@@ -1,6 +1,8 @@
 <?php
 
-include "../init.php";
+$root_path = realpath(dirname(__FILE__) . '/..');
+include $root_path . "/init.php";
+
 $lockFile = "$CACHE_PATH/router_monitor.lock";
 
 if (!is_dir($CACHE_PATH)) {
@@ -245,6 +247,18 @@ if ($config['router_check']) {
         sendTelegram($message);
     }
     echo "Router monitoring finished checking.\n";
+}
+
+// M-Pesa Reconciliation
+if (file_exists($PAYMENTGATEWAY_PATH . DIRECTORY_SEPARATOR . 'mpesa.php')) {
+    include $PAYMENTGATEWAY_PATH . DIRECTORY_SEPARATOR . 'mpesa.php';
+    try {
+        _log('Running M-Pesa transaction reconciliation', 'CRON');
+        reconcile_transactions();
+        _log('M-Pesa transaction reconciliation completed', 'CRON');
+    } catch (Exception $e) {
+        _log('M-Pesa reconciliation failed: ' . $e->getMessage(), 'CRON');
+    }
 }
 
 flock($lock, LOCK_UN);

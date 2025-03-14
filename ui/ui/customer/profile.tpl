@@ -70,6 +70,7 @@
                                         value="{$_user['phonenumber']}"
                                         placeholder="{if $_c['country_code_phone']!= ''}{$_c['country_code_phone']}{/if} {Lang::T('Phone Number')}">
                                 </div>
+                                <span class="help-block"><small>{Lang::T('Required for M-Pesa payments. Use format: 254XXXXXXXXX')}</small></span>
                             </div>
                         </div>
                     {else}
@@ -87,6 +88,7 @@
                                             class="btn btn-info btn-flat">{Lang::T('Change')}</a>
                                     </span>
                                 </div>
+                                <span class="help-block"><small>{Lang::T('Required for M-Pesa payments. Use format: 254XXXXXXXXX')}</small></span>
                             </div>
                         </div>
                     {/if}
@@ -127,5 +129,32 @@
         </div>
     </div>
 </div>
+
+{if $_c['mpesa_consumer_key'] != '' && $_c['mpesa_consumer_secret'] != ''}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var phoneInput = document.getElementById('phonenumber');
+        
+        phoneInput.addEventListener('blur', function() {
+            var phone = this.value.trim();
+            var validationPattern = /^(?:254|0)?(7\d{8})$/;
+            
+            if (phone && !validationPattern.test(phone)) {
+                alert('{Lang::T("Invalid phone number format. Please use a valid Kenyan phone number.")}');
+                this.classList.add('is-invalid');
+            } else {
+                this.classList.remove('is-invalid');
+                
+                // Format correctly for M-Pesa
+                if (phone.startsWith('0')) {
+                    this.value = '254' + phone.substring(1);
+                } else if (phone.match(/^7\d{8}$/)) {
+                    this.value = '254' + phone;
+                }
+            }
+        });
+    });
+</script>
+{/if}
 
 {include file="customer/footer.tpl"}
