@@ -107,8 +107,7 @@ class MPesaGateway
     {
         $token = $this->getAccessToken();
         $headers = [
-            'Authorization: Bearer ' . $token,
-            'Content-Type: application/json'
+            'Authorization: Bearer ' . $token
         ];
 
         $response = Http::postJsonData(
