@@ -18,6 +18,7 @@
     <link rel="stylesheet" href="{$app_url}/ui/ui/styles/sweetalert2.min.css" />
     <script src="{$app_url}/ui/ui/scripts/sweetalert2.all.min.js"></script>
     <link rel="stylesheet" href="{$app_url}/ui/ui/styles/phpnuxbill.customer.css?2025.2.4" />
+    <link rel="stylesheet" href="{$app_url}/ui/ui/styles/mpesa-payment.css" />
 
     <style>
 
