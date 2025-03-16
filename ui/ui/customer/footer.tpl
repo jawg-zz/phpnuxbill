@@ -48,6 +48,7 @@
 
 <script src="{$app_url}/ui/ui/scripts/plugins/select2.min.js"></script>
 <script src="{$app_url}/ui/ui/scripts/custom.js?2025.2.5"></script>
+<script src="{$app_url}/ui/ui/scripts/mpesa-payment.js"></script>
 
 {if isset($xfooter)}
     {$xfooter}
