@@ -260,6 +260,7 @@
     </script>
 {/if}
 
+<script src="{$app_url}/ui/ui/scripts/mpesa-payment.js"></script>
 {include file="customer/footer.tpl"}
 
-<script src="{$app_url}/ui/ui/scripts/mpesa-payment.js"></script>
+
