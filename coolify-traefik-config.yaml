@@ -1,0 +1,17 @@
+http:
+  routers:
+    mpesa-callback-router:
+      rule: "Host(`www.spidmax.com`) && Path(`/payments/callbacks/confirmation`)"
+      service: "mpesa-callback-service"
+      entryPoints:
+        - web
+        - websecure
+      tls:
+        certResolver: default
+  
+  services:
+    mpesa-callback-service:
+      loadBalancer:
+        servers:
+          - url: "https://netbill.spidmax.com/?_route=callback/mpesa"
+        passHostHeader: false 

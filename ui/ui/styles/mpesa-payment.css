@@ -1,0 +1,194 @@
+/* M-PESA Payment Status UI */
+.mpesa-payment-status {
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.mpesa-payment-status .status-header {
+    padding: 15px 20px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.mpesa-payment-status .status-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0;
+}
+
+.mpesa-payment-status .status-body {
+    padding: 20px;
+    background: #fff;
+}
+
+.mpesa-payment-status .status-steps {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 20px 0;
+    position: relative;
+}
+
+.mpesa-payment-status .status-steps:before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 14px;
+    height: 100%;
+    width: 2px;
+    background: #e9ecef;
+    z-index: 1;
+}
+
+.mpesa-payment-status .status-step {
+    position: relative;
+    padding-left: 40px;
+    margin-bottom: 15px;
+    z-index: 2;
+}
+
+.mpesa-payment-status .status-step:last-child {
+    margin-bottom: 0;
+}
+
+.mpesa-payment-status .status-step-icon {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: #fff;
+    border: 2px solid #e9ecef;
+    text-align: center;
+    line-height: 27px;
+    z-index: 3;
+}
+
+.mpesa-payment-status .status-step.active .status-step-icon {
+    background: #007bff;
+    border-color: #007bff;
+    color: #fff;
+}
+
+.mpesa-payment-status .status-step.completed .status-step-icon {
+    background: #28a745;
+    border-color: #28a745;
+    color: #fff;
+}
+
+.mpesa-payment-status .status-step.failed .status-step-icon {
+    background: #dc3545;
+    border-color: #dc3545;
+    color: #fff;
+}
+
+.mpesa-payment-status .status-step-text {
+    font-weight: 500;
+    margin-bottom: 4px;
+}
+
+.mpesa-payment-status .status-step-subtext {
+    font-size: 13px;
+    color: #6c757d;
+}
+
+.mpesa-payment-status .status-step.active .status-step-text {
+    color: #007bff;
+    font-weight: 600;
+}
+
+.mpesa-payment-status .status-step.completed .status-step-text {
+    color: #28a745;
+}
+
+.mpesa-payment-status .status-step.failed .status-step-text {
+    color: #dc3545;
+}
+
+.mpesa-payment-status .status-indicator {
+    text-align: center;
+    padding: 20px 0;
+}
+
+.mpesa-payment-status .progress-spinner {
+    display: inline-block;
+    width: 50px;
+    height: 50px;
+    border: 3px solid rgba(0, 123, 255, 0.2);
+    border-radius: 50%;
+    border-top-color: #007bff;
+    animation: mpesa-spinner 1s ease-in-out infinite;
+}
+
+@keyframes mpesa-spinner {
+    to { transform: rotate(360deg); }
+}
+
+.mpesa-payment-status .status-message {
+    text-align: center;
+    margin-top: 15px;
+    font-weight: 500;
+}
+
+.mpesa-payment-status .status-timer {
+    text-align: center;
+    font-size: 12px;
+    color: #6c757d;
+    margin-top: 5px;
+}
+
+.mpesa-payment-status .status-footer {
+    padding: 15px 20px;
+    background: #f8f9fa;
+    border-top: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+}
+
+.mpesa-payment-status .status-actions {
+    margin-top: 20px;
+}
+
+/* Status-specific styling */
+.mpesa-status-checking .status-message {
+    color: #007bff;
+}
+
+.mpesa-status-paid .status-message {
+    color: #28a745;
+}
+
+.mpesa-status-failed .status-message {
+    color: #dc3545;
+}
+
+.mpesa-status-expired .status-message {
+    color: #dc3545;
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 576px) {
+    .mpesa-payment-status .status-footer {
+        flex-direction: column;
+    }
+    
+    .mpesa-payment-status .status-footer .btn {
+        margin-bottom: 10px;
+        width: 100%;
+    }
+}
+
+/* Animation for status changes */
+.fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+} 

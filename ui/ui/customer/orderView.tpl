@@ -91,33 +91,90 @@
                                         </button>
                                     </form>
                                 {else}
-                                    <div class="alert alert-warning">
-                                        <strong>{Lang::T('Payment in Progress')}:</strong>
-                                        <ol>
-                                            <li>{Lang::T('Check your phone for the STK Push')}</li>
-                                            <li>{Lang::T('Enter your M-Pesa PIN to complete payment')}</li>
-                                            <li>{Lang::T('Wait for confirmation')}</li>
-                                        </ol>
-                                        <p class="mt-2">{Lang::T('If you did not receive the STK Push, click Retry Payment below')}</p>
+                                    <div class="mpesa-payment-status mpesa-status-checking">
+                                        <div class="status-header">
+                                            <h4 class="status-title">{Lang::T('M-PESA Payment')}</h4>
+                                            <span class="status-badge" id="status-badge">
+                                                <span class="badge badge-primary">{Lang::T('Processing')}</span>
+                                            </span>
+                                        </div>
+                                        <div class="status-body">
+                                            <ul class="status-steps">
+                                                <li class="status-step completed" id="step-initiated">
+                                                    <div class="status-step-icon"><i class="fa fa-check"></i></div>
+                                                    <div class="status-step-content">
+                                                        <div class="status-step-text">{Lang::T('Payment Initiated')}</div>
+                                                        <div class="status-step-subtext">{Lang::T('Request sent to your phone')}</div>
+                                                    </div>
+                                                </li>
+                                                <li class="status-step active" id="step-approval">
+                                                    <div class="status-step-icon"><i class="fa fa-mobile"></i></div>
+                                                    <div class="status-step-content">
+                                                        <div class="status-step-text">{Lang::T('Waiting for Approval')}</div>
+                                                        <div class="status-step-subtext">{Lang::T('Please enter your M-PESA PIN')}</div>
+                                                    </div>
+                                                </li>
+                                                <li class="status-step" id="step-processing">
+                                                    <div class="status-step-icon"><i class="fa fa-exchange"></i></div>
+                                                    <div class="status-step-content">
+                                                        <div class="status-step-text">{Lang::T('Processing Payment')}</div>
+                                                        <div class="status-step-subtext">{Lang::T('Confirming transaction')}</div>
+                                                    </div>
+                                                </li>
+                                                <li class="status-step" id="step-completed">
+                                                    <div class="status-step-icon"><i class="fa fa-check-circle"></i></div>
+                                                    <div class="status-step-content">
+                                                        <div class="status-step-text">{Lang::T('Payment Completed')}</div>
+                                                        <div class="status-step-subtext">{Lang::T('Your package will be activated')}</div>
+                                                    </div>
+                                                </li>
+                                            </ul>
+                                            
+                                            <div class="status-indicator">
+                                                <div class="progress-spinner" id="payment-spinner"></div>
+                                                <div class="status-message" id="payment-message">
+                                                    {Lang::T('Waiting for your payment approval')}
+                                                </div>
+                                                <div class="status-timer" id="payment-timer"></div>
+                                            </div>
+                                        </div>
+                                        <div class="status-footer">
+                                            <div class="status-actions">
+                                                <a href="{$_url}order/view/{$trx['id']}/check" id="check-status-btn" class="btn btn-info">
+                                                    <i class="fa fa-refresh"></i> {Lang::T('Check Status')}
+                                                </a>
+                                            </div>
+                                            <div class="status-actions">
+                                                <div class="btn-group">
+                                                    <form method="POST" action="{$_url}order/buy/{$plan['id']}/{$router['id']}" id="retry-payment-form" style="display:inline-block;">
+                                                        <input type="hidden" name="gateway" value="mpesa">
+                                                        <button type="submit" class="btn btn-warning" id="retry-payment-btn">
+                                                            <i class="fa fa-repeat"></i> {Lang::T('Retry Payment')}
+                                                        </button>
+                                                    </form>
+                                                    <a href="{$_url}order/package" class="btn btn-default" id="other-options-btn">
+                                                        <i class="fa fa-arrow-left"></i> {Lang::T('Other Options')}
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div class="btn-group btn-group-justified mb10">
-                                        <a href="{$_url}order/view/{$trx['id']}/check" class="btn btn-info btn-lg">
-                                            <i class="fa fa-refresh"></i> {Lang::T('Check Status')}
+                                    
+                                    <div class="payment-success-actions text-center mt-3" style="display:none;" id="success-actions">
+                                        <div class="alert alert-success">
+                                            <strong><i class="fa fa-check-circle"></i> {Lang::T('Payment Successful!')}</strong>
+                                            <p>{Lang::T('Your package has been activated')}</p>
+                                        </div>
+                                        <a href="{$_url}dashboard" class="btn btn-success btn-lg">
+                                            <i class="fa fa-home"></i> {Lang::T('Go to Dashboard')}
                                         </a>
                                     </div>
-                                    <div class="btn-group btn-group-justified">
-                                        <form method="POST" action="{$_url}order/buy/{$plan['id']}/{$router['id']}">
-                                            <input type="hidden" name="gateway" value="mpesa">
-                                            <button type="submit" class="btn btn-warning">
-                                                <i class="fa fa-repeat"></i> {Lang::T('Retry Payment')}
-                                            </button>
-                                        </form>
-                                        <a href="{$_url}order/package" class="btn btn-default">
-                                            <i class="fa fa-shopping-cart"></i> {Lang::T('Other Payment Options')}
-                                        </a>
-                                    </div>
-                                    <div class="alert alert-info mt10">
-                                        <i class="fa fa-info-circle"></i> {Lang::T('Page will auto-refresh to check payment status')}
+                                    
+                                    <div class="payment-failure-actions text-center mt-3" style="display:none;" id="failure-actions">
+                                        <div class="alert alert-danger">
+                                            <strong><i class="fa fa-times-circle"></i> <span id="failure-message">{Lang::T('Payment Failed')}</span></strong>
+                                            <p>{Lang::T('Please try again or choose another payment method')}</p>
+                                        </div>
                                     </div>
                                 {/if}
                             </div>
@@ -175,11 +232,34 @@
 
 {if $trx['status']==1 && $trx['gateway'] eq 'mpesa' && isset($trx['pg_request'])}
     <script>
-        // Auto refresh for pending M-Pesa transactions
-        setTimeout(function() {
-            window.location.href = '{$_url}order/view/{$trx['id']}/check';
-        }, 10000); // Refresh every 10 seconds
+        // Initialize the enhanced payment checker
+        $(document).ready(function() {
+            // Define Lang translation object if it doesn't exist
+            if (typeof Lang === 'undefined') {
+                window.Lang = {
+                    T: function(text) {
+                        return text;
+                    }
+                };
+            }
+            
+            // Define appUrl if it doesn't exist
+            if (typeof appUrl === 'undefined') {
+                window.appUrl = '{$_url}';
+            }
+            
+            // Initialize the payment checker
+            const paymentChecker = new MpesaPaymentChecker({
+                transactionId: '{$trx['id']}',
+                checkUrl: '{$_url}callback/check-payment-status',
+                redirectUrl: '{$_url}dashboard',
+                checkInterval: 6000, // Check every 6 seconds
+                maxAttempts: 50      // Maximum 50 attempts (5 minutes)
+            });
+        });
     </script>
 {/if}
 
 {include file="customer/footer.tpl"}
+
+<script src="{$app_url}/ui/ui/scripts/mpesa-payment.js"></script>
