@@ -72,7 +72,13 @@ switch ($action) {
         try {
             include $PAYMENTGATEWAY_PATH . DIRECTORY_SEPARATOR . 'mpesa.php';
             
-            $mpesa = get_mpesa_gateway();
+            $mpesa = new MPesaGateway([
+                'consumer_key' => $config['mpesa_consumer_key'],
+                'consumer_secret' => $config['mpesa_consumer_secret'],
+                'shortcode' => $config['mpesa_shortcode'],
+                'passkey' => $config['mpesa_passkey'],
+                'environment' => $_app_stage == 'Live' ? 'production' : 'sandbox'
+            ]);
             $result = $mpesa->queryTransactionStatus($trx['gateway_trx_id']);
             
             if ($result['ResultCode'] === '0') {

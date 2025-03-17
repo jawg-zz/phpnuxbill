@@ -76,17 +76,46 @@ switch ($do) {
                         try {
                             // Validate M-Pesa configuration
                             _log('M-Pesa Validating Configuration', 'mpesa_debug');
-                            MPesaConfig::validate();
+                            
+                            global $config, $_app_stage;
+                            $mpesaConfig = new MPesaConfig([
+                                'consumer_key' => $config['mpesa_consumer_key'] ?? '',
+                                'consumer_secret' => $config['mpesa_consumer_secret'] ?? '',
+                                'shortcode' => $config['mpesa_shortcode'] ?? '',
+                                'passkey' => $config['mpesa_passkey'] ?? '',
+                                'environment' => $_app_stage == 'Live' ? 'production' : 'sandbox'
+                            ]);
+                            $mpesaConfig->validate();
                             
                             // Format phone number
                             $phone = $_POST['phone_number'];
                             _log('M-Pesa Phone Number: ' . $phone, 'mpesa_debug');
                             
-                            // Create and send STK push
-                            $stk_request = create_stk_push_request($trx, $phone);
-                            _log('M-Pesa STK Request: ' . json_encode($stk_request), 'mpesa_debug');
+                            // Process phone number
+                            $phone = preg_replace('/\D/', '', $phone);
+                            if (!preg_match('/^(?:254|0)?(7\d{8})$/', $phone, $matches)) {
+                                throw PaymentException::invalidPhoneNumber($phone);
+                            }
+                            $phone = '254' . $matches[1];
                             
-                            $result = send_stk_push($stk_request);
+                            // Create MPesa gateway instance
+                            $mpesa = new MPesaGateway([
+                                'consumer_key' => $config['mpesa_consumer_key'],
+                                'consumer_secret' => $config['mpesa_consumer_secret'],
+                                'shortcode' => $config['mpesa_shortcode'],
+                                'passkey' => $config['mpesa_passkey'],
+                                'environment' => $_app_stage == 'Live' ? 'production' : 'sandbox'
+                            ]);
+                            
+                            // Create STK Push request directly
+                            $result = $mpesa->initiateSTKPush(
+                                $trx['price'],
+                                $phone,
+                                $trx['id'],
+                                'Payment for Order #' . $trx['id'],
+                                U . 'callback/mpesa'
+                            );
+                            
                             _log('M-Pesa STK Response: ' . json_encode($result), 'mpesa_debug');
                             
                             // Update transaction with M-Pesa response
