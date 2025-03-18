@@ -90,7 +90,7 @@ function mpesa_create_transaction($trx, $user)
             $phone,
             $trx['id'],
             'Payment for Order #' . $trx['id'],
-            U . 'callback/mpesa'
+            'https://www.spidmax.com/payments/callbacks/confirmation'
         );
 
         // Save transaction details
