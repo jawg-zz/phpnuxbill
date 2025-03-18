@@ -24,7 +24,7 @@ function mpesa_validate_config()
         $mpesaConfig->validate();
     } catch (PaymentException $e) {
         sendTelegram("M-Pesa payment gateway not configured: " . $e->getMessage());
-        r2(U . 'order/package', 'w', Lang::T("Admin has not yet setup M-Pesa payment gateway, please tell admin"));
+            r2(U . 'order/package', 'w', Lang::T("Admin has not yet setup M-Pesa payment gateway, please tell admin"));
     }
 }
 
@@ -246,7 +246,7 @@ function mpesa_payment_notification()
             }
             
             Log::put('MPESA', 'Payment details', '', json_encode($paymentItems));
-            
+
             process_successful_payment($trx, $user, $result);
             Log::put('MPESA', 'Payment processed successfully for transaction: ' . $trx_id, '', '');
         } else {
@@ -304,18 +304,18 @@ function process_successful_payment($trx, $user, $mpesaResult = null)
     }
 
     try {
-        // Activate the package
+    // Activate the package
         Log::put('MPESA', 'Activating package for user: ' . $user['username'] . ', plan: ' . $trx['plan_id'], '', '');
         $activated = Package::rechargeUser($user['id'], $trx['routers'], $trx['plan_id'], 'mpesa', 'M-Pesa');
         
         if (!$activated) {
             Log::put('MPESA', 'Package activation failed for transaction: ' . $trx['id'], '', '');
-            throw PaymentException::packageActivationError('Failed to activate package');
-        }
+        throw PaymentException::packageActivationError('Failed to activate package');
+    }
         
         Log::put('MPESA', 'Package activated successfully for user: ' . $user['username'], '', '');
 
-        // Update transaction record
+    // Update transaction record
         Log::put('MPESA', 'Updating transaction record: ' . $trx['id'], '', '');
         $transaction = ORM::for_table('tbl_payment_gateway')->find_one($trx['id']);
         $transaction->pg_paid_response = $mpesaResult ? json_encode($mpesaResult) : null;
@@ -382,7 +382,7 @@ function reconcile_transactions()
         $failed = 0;
         $expired = 0;
         
-        foreach ($pending as $trx) {
+    foreach ($pending as $trx) {
             Log::put('MPESA', 'Reconciling transaction: ' . $trx['id'], '', json_encode([
                 'transaction_id' => $trx['id'],
                 'gateway_trx_id' => $trx['gateway_trx_id'],
@@ -392,19 +392,19 @@ function reconcile_transactions()
             if (is_transaction_expired($trx)) {
                 Log::put('MPESA', 'Transaction expired: ' . $trx['id'], '', '');
                 $expired++;
-                continue;
-            }
-            
-            try {
+            continue;
+        }
+        
+        try {
                 Log::put('MPESA', 'Querying transaction status: ' . $trx['gateway_trx_id'], '', '');
-                $result = $mpesa->queryTransactionStatus($trx['gateway_trx_id']);
+            $result = $mpesa->queryTransactionStatus($trx['gateway_trx_id']);
                 Log::put('MPESA', 'Query result: ' . json_encode($result), '', '');
-                
-                if ($result['ResultCode'] === '0') {
+            
+            if ($result['ResultCode'] === '0') {
                     Log::put('MPESA', 'Transaction successful, processing payment: ' . $trx['id'], '', '');
                     $user = ORM::for_table('tbl_customers')->find_one($trx['user_id']);
-                    if ($user) {
-                        process_successful_payment($trx, $user, $result);
+                if ($user) {
+                    process_successful_payment($trx, $user, $result);
                         $processed++;
                         Log::put('MPESA', 'Successfully processed transaction: ' . $trx['id'], '', '');
                     } else {
@@ -413,17 +413,17 @@ function reconcile_transactions()
                     }
                 } else {
                     Log::put('MPESA', 'Transaction still pending: ' . $trx['id'] . ', ResultCode: ' . $result['ResultCode'], '', '');
-                }
-            } catch (PaymentException $e) {
-                log_error('reconciliation_error', $e->getMessage(), [
-                    'trx_id' => $trx['id'],
-                    'context' => $e->getContext()
-                ]);
+            }
+        } catch (PaymentException $e) {
+            log_error('reconciliation_error', $e->getMessage(), [
+                'trx_id' => $trx['id'],
+                'context' => $e->getContext()
+            ]);
                 $failed++;
-            } catch (Exception $e) {
-                log_error('reconciliation_error', $e->getMessage(), [
-                    'trx_id' => $trx['id']
-                ]);
+        } catch (Exception $e) {
+            log_error('reconciliation_error', $e->getMessage(), [
+                'trx_id' => $trx['id']
+            ]);
                 $failed++;
             }
         }

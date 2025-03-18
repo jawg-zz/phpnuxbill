@@ -5,18 +5,28 @@
  *  by https://t.me/ibnux
  **/
 
-
-$action = $routes['1'];
-
-
-if (file_exists($PAYMENTGATEWAY_PATH . DIRECTORY_SEPARATOR . $action . '.php')) {
-    include $PAYMENTGATEWAY_PATH . DIRECTORY_SEPARATOR . $action . '.php';
-    if (function_exists($action . '_payment_notification')) {
-        run_hook('callback_payment_notification'); #HOOK
-        call_user_func($action . '_payment_notification');
-        die();
-    }
+if (!defined('_VALID_ACCESS')) {
+    die('Direct access to this location is not allowed.');
 }
 
-header('HTTP/1.1 404 Not Found');
-echo 'Not Found';
+$routes = explode('/', $req);
+$gateway = $routes[1] ?? null;
+
+switch ($gateway) {
+    case 'mpesa':
+        try {
+            include $PAYMENTGATEWAY_PATH . DIRECTORY_SEPARATOR . 'mpesa.php';
+            mpesa_payment_notification();
+        } catch (Exception $e) {
+            Log::put('MPESA', 'Callback Error: ' . $e->getMessage(), '', json_encode([
+                'trace' => $e->getTraceAsString()
+            ]));
+            http_response_code(500);
+            die('Error processing callback');
+        }
+        break;
+        
+    default:
+        http_response_code(404);
+        die('Invalid payment gateway');
+}

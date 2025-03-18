@@ -9,12 +9,14 @@ class MPesaGateway
     private string $baseUrl;
     private const MAX_RETRIES = 3;
     private const RETRY_DELAY = 1; // seconds
+    private MPesaConfig $mpesaConfig;
 
     public function __construct(array $config)
     {
-        $this->validateConfig($config);
+        $this->mpesaConfig = new MPesaConfig($config);
+        $this->mpesaConfig->validate();
         $this->config = $config;
-        $this->baseUrl = $this->getBaseUrl();
+        $this->baseUrl = $this->mpesaConfig->getServer();
     }
 
     /**
@@ -27,17 +29,21 @@ class MPesaGateway
         string $transactionDesc,
         string $callbackUrl
     ): array {
+        // Validate amount and phone number
+        $this->mpesaConfig->validateAmount($amount);
+        $phone = $this->mpesaConfig->validatePhone($phone);
+        
         $timestamp = date('YmdHis');
         $password = $this->generatePassword($timestamp);
 
         $payload = [
-            'BusinessShortCode' => $this->config['shortcode'],
+            'BusinessShortCode' => $this->mpesaConfig->getShortcode(),
             'Password' => $password,
             'Timestamp' => $timestamp,
-            'TransactionType' => 'CustomerPayBillOnline',
+            'TransactionType' => MPesaConfig::CUSTOMER_PAYBILL_ONLINE,
             'Amount' => $amount,
             'PartyA' => $phone,
-            'PartyB' => $this->config['shortcode'],
+            'PartyB' => $this->mpesaConfig->getShortcode(),
             'PhoneNumber' => $phone,
             'CallBackURL' => $callbackUrl,
             'AccountReference' => $accountRef,
@@ -56,7 +62,7 @@ class MPesaGateway
         $password = $this->generatePassword($timestamp);
 
         $payload = [
-            'BusinessShortCode' => $this->config['shortcode'],
+            'BusinessShortCode' => $this->mpesaConfig->getShortcode(),
             'Password' => $password,
             'Timestamp' => $timestamp,
             'CheckoutRequestID' => $checkoutRequestId
@@ -125,8 +131,8 @@ class MPesaGateway
     private function getAccessToken(): string
     {
         $credentials = base64_encode(
-            $this->config['consumer_key'] . ':' . 
-            $this->config['consumer_secret']
+            $this->mpesaConfig->getConsumerKey() . ':' . 
+            $this->mpesaConfig->getConsumerSecret()
         );
 
         $response = Http::getData(
@@ -153,38 +159,10 @@ class MPesaGateway
     private function generatePassword(string $timestamp): string
     {
         return base64_encode(
-            $this->config['shortcode'] . 
-            $this->config['passkey'] . 
+            $this->mpesaConfig->getShortcode() . 
+            $this->mpesaConfig->getPasskey() . 
             $timestamp
         );
-    }
-
-    /**
-     * Gets the appropriate API base URL
-     */
-    private function getBaseUrl(): string
-    {
-        return $this->config['environment'] === 'production'
-            ? 'https://api.safaricom.co.ke/'
-            : 'https://sandbox.safaricom.co.ke/';
-    }
-
-    /**
-     * Validates the configuration
-     */
-    private function validateConfig(array $config): void
-    {
-        $required = ['consumer_key', 'consumer_secret', 'shortcode', 'passkey', 'environment'];
-        
-        foreach ($required as $field) {
-            if (empty($config[$field])) {
-                throw new PaymentException(
-                    "Missing required configuration: $field",
-                    PaymentException::INVALID_CONFIGURATION,
-                    ['field' => $field]
-                );
-            }
-        }
     }
 
     /**
@@ -227,10 +205,29 @@ class MPesaGateway
 class MPesaConfig {
     private array $config;
     
+    // Transaction Statuses
     const PENDING_STATUS = 0;
     const PAID_STATUS = 1;
     const FAILED_STATUS = 2;
     const EXPIRED_STATUS = 3;
+    const CANCELLED_STATUS = 4;
+    const REFUNDED_STATUS = 5;
+    
+    // M-Pesa Result Codes
+    const MPESA_SUCCESS = '0';
+    const MPESA_PENDING = '1032'; // Request cancelled by user
+    const MPESA_INSUFFICIENT_FUNDS = '1037';
+    const MPESA_TRANSACTION_FAILED = '1';
+    
+    // Transaction Types
+    const CUSTOMER_PAYBILL_ONLINE = 'CustomerPayBillOnline';
+    const CUSTOMER_BUYGOODS_ONLINE = 'CustomerBuyGoodsOnline';
+    
+    // Validation Constants
+    const PHONE_REGEX = '/^(?:254|0)?(7\d{8})$/';
+    const MAX_AMOUNT = 150000;
+    const MIN_AMOUNT = 1;
+    const EXPIRY_HOURS = 4;
     
     public function __construct(array $config) {
         $this->config = $config;
@@ -248,6 +245,45 @@ class MPesaConfig {
                 );
             }
         }
+    }
+    
+    public function validateAmount(float $amount): void {
+        if ($amount < self::MIN_AMOUNT || $amount > self::MAX_AMOUNT) {
+            throw new PaymentException(
+                "Amount must be between " . self::MIN_AMOUNT . " and " . self::MAX_AMOUNT,
+                PaymentException::INVALID_AMOUNT,
+                ['amount' => $amount]
+            );
+        }
+    }
+    
+    public function validatePhone(string $phone): string {
+        $phone = preg_replace('/\D/', '', $phone);
+        if (!preg_match(self::PHONE_REGEX, $phone, $matches)) {
+            throw PaymentException::invalidPhoneNumber($phone);
+        }
+        return '254' . $matches[1];
+    }
+    
+    public function getTransactionStatus(string $resultCode): int {
+        return match($resultCode) {
+            self::MPESA_SUCCESS => self::PAID_STATUS,
+            self::MPESA_PENDING => self::PENDING_STATUS,
+            self::MPESA_INSUFFICIENT_FUNDS => self::FAILED_STATUS,
+            default => self::FAILED_STATUS
+        };
+    }
+    
+    public function getStatusText(int $status): string {
+        return match($status) {
+            self::PENDING_STATUS => 'Pending',
+            self::PAID_STATUS => 'Paid',
+            self::FAILED_STATUS => 'Failed',
+            self::EXPIRED_STATUS => 'Expired',
+            self::CANCELLED_STATUS => 'Cancelled',
+            self::REFUNDED_STATUS => 'Refunded',
+            default => 'Unknown'
+        };
     }
     
     public function getConsumerKey(): string {
@@ -272,6 +308,10 @@ class MPesaConfig {
             ? 'https://api.safaricom.co.ke/'
             : 'https://sandbox.safaricom.co.ke/';
     }
+    
+    public function getExpiryTime(): string {
+        return date('Y-m-d H:i:s', strtotime('+ ' . self::EXPIRY_HOURS . ' HOURS'));
+    }
 }
 
 /**
@@ -289,6 +329,11 @@ class PaymentException extends Exception {
     const INVALID_CALLBACK = 1008;
     const AMOUNT_MISMATCH = 1009;
     const TRANSACTION_EXPIRED = 1010;
+    const INVALID_AMOUNT = 1011;
+    const INSUFFICIENT_FUNDS = 1012;
+    const REQUEST_CANCELLED = 1013;
+    const DUPLICATE_TRANSACTION = 1014;
+    const INVALID_ACCOUNT = 1015;
     
     /**
      * Additional payment context data
@@ -297,11 +342,6 @@ class PaymentException extends Exception {
     
     /**
      * Creates a new PaymentException instance
-     *
-     * @param string $message Error message
-     * @param int $code Error code
-     * @param array $context Additional context data
-     * @param Throwable|null $previous Previous exception
      */
     public function __construct(
         string $message,
@@ -428,6 +468,61 @@ class PaymentException extends Exception {
             "Transaction expired: $transactionId",
             self::TRANSACTION_EXPIRED,
             ['transaction_id' => $transactionId]
+        );
+    }
+    
+    /**
+     * Creates an exception for invalid amount
+     */
+    public static function invalidAmount(float $amount, float $min, float $max): self {
+        return new self(
+            "Invalid amount. Must be between $min and $max",
+            self::INVALID_AMOUNT,
+            ['amount' => $amount, 'min' => $min, 'max' => $max]
+        );
+    }
+    
+    /**
+     * Creates an exception for insufficient funds
+     */
+    public static function insufficientFunds(string $phone): self {
+        return new self(
+            Lang::T('Insufficient funds in M-Pesa account'),
+            self::INSUFFICIENT_FUNDS,
+            ['phone' => $phone]
+        );
+    }
+    
+    /**
+     * Creates an exception for cancelled requests
+     */
+    public static function requestCancelled(string $transactionId): self {
+        return new self(
+            Lang::T('M-Pesa payment request cancelled by user'),
+            self::REQUEST_CANCELLED,
+            ['transaction_id' => $transactionId]
+        );
+    }
+    
+    /**
+     * Creates an exception for duplicate transactions
+     */
+    public static function duplicateTransaction(string $transactionId): self {
+        return new self(
+            "Duplicate transaction detected: $transactionId",
+            self::DUPLICATE_TRANSACTION,
+            ['transaction_id' => $transactionId]
+        );
+    }
+    
+    /**
+     * Creates an exception for invalid account
+     */
+    public static function invalidAccount(string $account): self {
+        return new self(
+            "Invalid account reference: $account",
+            self::INVALID_ACCOUNT,
+            ['account' => $account]
         );
     }
 }
