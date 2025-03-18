@@ -218,6 +218,50 @@ class MPesaConfig {
     const MPESA_PENDING = '1032'; // Request cancelled by user
     const MPESA_INSUFFICIENT_FUNDS = '1037';
     const MPESA_TRANSACTION_FAILED = '1';
+    const MPESA_DUPLICATE = '1031';
+    const MPESA_INVALID_AMOUNT = '1033';
+    const MPESA_INVALID_ACCOUNT = '1034';
+    const MPESA_SYSTEM_ERROR = '1035';
+    
+    // Status Details
+    private const STATUS_DETAILS = [
+        self::PENDING_STATUS => [
+            'text' => 'Pending',
+            'icon' => 'fa-clock',
+            'color' => 'warning',
+            'description' => 'Waiting for payment confirmation from M-Pesa'
+        ],
+        self::PAID_STATUS => [
+            'text' => 'Paid',
+            'icon' => 'fa-check-circle',
+            'color' => 'success',
+            'description' => 'Payment has been successfully processed'
+        ],
+        self::FAILED_STATUS => [
+            'text' => 'Failed',
+            'icon' => 'fa-times-circle',
+            'color' => 'danger',
+            'description' => 'Payment processing failed'
+        ],
+        self::EXPIRED_STATUS => [
+            'text' => 'Expired',
+            'icon' => 'fa-hourglass-end',
+            'color' => 'secondary',
+            'description' => 'Payment request has expired'
+        ],
+        self::CANCELLED_STATUS => [
+            'text' => 'Cancelled',
+            'icon' => 'fa-ban',
+            'color' => 'info',
+            'description' => 'Payment request was cancelled'
+        ],
+        self::REFUNDED_STATUS => [
+            'text' => 'Refunded',
+            'icon' => 'fa-undo',
+            'color' => 'primary',
+            'description' => 'Payment has been refunded'
+        ]
+    ];
     
     // Transaction Types
     const CUSTOMER_PAYBILL_ONLINE = 'CustomerPayBillOnline';
@@ -274,15 +318,73 @@ class MPesaConfig {
         };
     }
     
+    public function getStatusDetails(int $status): array {
+        return self::STATUS_DETAILS[$status] ?? [
+            'text' => 'Unknown',
+            'icon' => 'fa-question-circle',
+            'color' => 'secondary',
+            'description' => 'Unknown payment status'
+        ];
+    }
+    
     public function getStatusText(int $status): string {
-        return match($status) {
-            self::PENDING_STATUS => 'Pending',
-            self::PAID_STATUS => 'Paid',
-            self::FAILED_STATUS => 'Failed',
-            self::EXPIRED_STATUS => 'Expired',
-            self::CANCELLED_STATUS => 'Cancelled',
-            self::REFUNDED_STATUS => 'Refunded',
-            default => 'Unknown'
+        return $this->getStatusDetails($status)['text'];
+    }
+    
+    public function getStatusIcon(int $status): string {
+        return $this->getStatusDetails($status)['icon'];
+    }
+    
+    public function getStatusColor(int $status): string {
+        return $this->getStatusDetails($status)['color'];
+    }
+    
+    public function getStatusDescription(int $status): string {
+        return $this->getStatusDetails($status)['description'];
+    }
+    
+    public function getResultCodeDetails(string $resultCode): array {
+        return match($resultCode) {
+            self::MPESA_SUCCESS => [
+                'status' => self::PAID_STATUS,
+                'message' => 'Payment successful',
+                'description' => 'The payment has been processed successfully'
+            ],
+            self::MPESA_PENDING => [
+                'status' => self::PENDING_STATUS,
+                'message' => 'Payment pending',
+                'description' => 'Waiting for payment confirmation'
+            ],
+            self::MPESA_INSUFFICIENT_FUNDS => [
+                'status' => self::FAILED_STATUS,
+                'message' => 'Insufficient funds',
+                'description' => 'Your M-Pesa account has insufficient funds'
+            ],
+            self::MPESA_DUPLICATE => [
+                'status' => self::FAILED_STATUS,
+                'message' => 'Duplicate transaction',
+                'description' => 'This transaction has already been processed'
+            ],
+            self::MPESA_INVALID_AMOUNT => [
+                'status' => self::FAILED_STATUS,
+                'message' => 'Invalid amount',
+                'description' => 'The payment amount is invalid'
+            ],
+            self::MPESA_INVALID_ACCOUNT => [
+                'status' => self::FAILED_STATUS,
+                'message' => 'Invalid account',
+                'description' => 'The account reference is invalid'
+            ],
+            self::MPESA_SYSTEM_ERROR => [
+                'status' => self::FAILED_STATUS,
+                'message' => 'System error',
+                'description' => 'M-Pesa system is currently unavailable'
+            ],
+            default => [
+                'status' => self::FAILED_STATUS,
+                'message' => 'Transaction failed',
+                'description' => 'The payment could not be processed'
+            ]
         };
     }
     
