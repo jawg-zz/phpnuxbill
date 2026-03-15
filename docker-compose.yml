@@ -1,0 +1,26 @@
+services:
+  nuxbill:
+    pull_policy: always
+    build: ./
+    restart: unless-stopped
+    ports:
+      - "80"
+    environment:
+      TZ: Africa/Nairobi
+    depends_on:
+      - mysql
+
+  mysql:
+    image: bitnami/mariadb:latest
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MARIADB_DATABASE: "nuxbill"
+    ports:
+      - "3306"
+
+# skip data persistance (if dev testing)
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+volumes:
+  mysql_data:
